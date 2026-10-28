@@ -142,48 +142,125 @@ export function saveSupabaseConfig(url: string, anonKey: string): { success: boo
   }
 }
 
-export async function testSupabaseConnection(url: string, anonKey: string): Promise<{ success: boolean; message: string; tablesStatus?: Record<string, boolean> }> {
+export async function testSupabaseConnection(url: string, anonKey: string): Promise<{
+  success: boolean;
+  message: string;
+  clientInitialized?: boolean;
+  authEndpointOk?: boolean;
+  tablesStatus?: Record<string, boolean>;
+  allTablesReady?: boolean;
+}> {
   try {
-    const testClient = createClient(url, anonKey, {
-      auth: { persistSession: false },
-    });
-    
-    // Check auth endpoint reachability
-    const { error: authError } = await testClient.auth.getSession();
-    if (authError && authError.status !== 400 && authError.status !== 401) {
-      return { success: false, message: `Erro no endpoint de autenticação: ${authError.message}` };
+    const cleanUrl = url.trim();
+    const cleanKey = anonKey.trim();
+
+    if (!cleanUrl || !cleanKey) {
+      return { success: false, message: 'Preencha a URL e a Anon Key antes de testar.' };
     }
 
-    // Check tables existence
+    try {
+      new URL(cleanUrl);
+    } catch {
+      return { success: false, message: 'A URL informada não é válida. O formato deve ser https://seu-projeto.supabase.co' };
+    }
+
+    if (!cleanUrl.startsWith('https://')) {
+      return { success: false, message: 'A URL do Supabase precisa começar com https://' };
+    }
+
+    // Initialize test client
+    let testClient: SupabaseClient;
+    try {
+      testClient = createClient(cleanUrl, cleanKey, {
+        auth: { persistSession: false },
+      });
+    } catch (clientErr: any) {
+      return {
+        success: false,
+        message: `Falha ao instanciar o cliente Supabase: ${clientErr.message}`,
+        clientInitialized: false,
+      };
+    }
+
+    // 1. Check auth endpoint reachability
+    let authEndpointOk = false;
+    try {
+      const { error: authError } = await testClient.auth.getSession();
+      if (authError && authError.status !== 400 && authError.status !== 401) {
+        return {
+          success: false,
+          clientInitialized: true,
+          message: `Erro ao comunicar com o serviço de autenticação do Supabase: ${authError.message}`,
+        };
+      }
+      authEndpointOk = true;
+    } catch (authErr: any) {
+      return {
+        success: false,
+        clientInitialized: true,
+        message: `Não foi possível conectar ao servidor Supabase. Verifique se o endereço da URL está correto ou se o projeto não está pausado: ${authErr.message}`,
+      };
+    }
+
+    // 2. Check tables existence
     const tables = ['tasks', 'clients', 'vehicles', 'budgets', 'workshop_config', 'profiles'];
     const tablesStatus: Record<string, boolean> = {};
     let missingTables: string[] = [];
 
     for (const table of tables) {
       const { error } = await testClient.from(table).select('id').limit(1);
-      if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
-        tablesStatus[table] = false;
-        missingTables.push(table);
+      if (error) {
+        if (
+          error.code === 'PGRST301' ||
+          error.message?.toLowerCase().includes('jwt') ||
+          error.message?.toLowerCase().includes('apikey') ||
+          error.message?.toLowerCase().includes('invalid api key')
+        ) {
+          return {
+            success: false,
+            clientInitialized: true,
+            authEndpointOk: true,
+            message: `Chave Anon inválida ou incorreta: ${error.message}. Certifique-se de copiar a chave "anon public" das configurações do seu projeto Supabase.`,
+          };
+        }
+        if (error.code === '42P01' || error.code === 'PGRST205') {
+          tablesStatus[table] = false;
+          missingTables.push(table);
+        } else {
+          // Table exists
+          tablesStatus[table] = true;
+        }
       } else {
         tablesStatus[table] = true;
       }
     }
 
-    if (missingTables.length > 0) {
+    const allTablesReady = missingTables.length === 0;
+
+    if (!allTablesReady) {
       return {
         success: true,
-        message: `Conectado ao Supabase com sucesso! Atenção: as tabelas (${missingTables.join(', ')}) ainda não foram criadas. Copie e execute o script SQL no SQL Editor do Supabase.`,
+        clientInitialized: true,
+        authEndpointOk: true,
+        allTablesReady: false,
+        message: `Cliente Supabase inicializado e autenticado com sucesso! Porém, as tabelas (${missingTables.join(', ')}) ainda não existem neste novo projeto. Copie o script SQL na aba "Script SQL" e execute no SQL Editor do Supabase.`,
         tablesStatus,
       };
     }
 
     return {
       success: true,
-      message: 'Conexão com Supabase 100% validada! Todas as tabelas (tasks, clients, vehicles, budgets, workshop_config, profiles) estão prontas para sincronização.',
+      clientInitialized: true,
+      authEndpointOk: true,
+      allTablesReady: true,
+      message: 'Cliente Supabase inicializado e 100% validado! Todas as 6 tabelas e permissões estão prontas para sincronizar entre todos os seus dispositivos.',
       tablesStatus,
     };
   } catch (err: any) {
-    return { success: false, message: err.message || 'Falha ao conectar no host Supabase' };
+    return {
+      success: false,
+      message: err.message || 'Falha inesperada ao conectar ao Supabase.',
+    };
   }
 }
 

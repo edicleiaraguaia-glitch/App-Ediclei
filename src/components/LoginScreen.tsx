@@ -4,7 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { UserProfile } from '../types';
 import { getSavedConfig } from '../lib/supabase';
 
-export const LoginScreen: React.FC = () => {
+interface LoginScreenProps {
+  onOpenSupabaseModal?: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenSupabaseModal }) => {
   const { login, register, localPendingAccounts, migrateLocalAccount } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -80,10 +84,16 @@ export const LoginScreen: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Oficina Evaldo Pinturas</h2>
           <p className="text-xs text-slate-500 mt-1">Gestor de Tarefas, Funilaria & Pendências em Tempo Real</p>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold mt-3 max-w-full truncate">
-            <Database className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span className="truncate">Supabase Auth: {projectHost || 'Conectado'}</span>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenSupabaseModal}
+            title="Clique para configurar o projeto Supabase"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold mt-3 max-w-full truncate transition-colors cursor-pointer group"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-600 shrink-0 group-hover:rotate-12 transition-transform" />
+            <span className="truncate">Supabase: {projectHost || 'Conectar Novo'}</span>
+            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-200/60 px-1.5 py-0.5 rounded-full ml-1">Configurar</span>
+          </button>
         </div>
 
         {/* Tab switcher: Entrar vs Cadastrar */}
@@ -259,13 +269,24 @@ export const LoginScreen: React.FC = () => {
             </button>
           </form>
 
-          {/* Helper hint */}
-          <div className="text-center pt-2">
+          {/* Helper hint & Supabase Switcher */}
+          <div className="text-center pt-2 space-y-2">
             <p className="text-[11px] text-slate-400">
               {mode === 'login'
                 ? 'Ainda não possui conta? Clique em "Criar Cadastro" acima.'
                 : 'Seus dados serão gravados de forma segura no Supabase.'}
             </p>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={onOpenSupabaseModal}
+                className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold inline-flex items-center gap-1.5 hover:underline py-1 px-2.5 rounded-lg hover:bg-emerald-50 transition-colors"
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Configurar / Conectar Novo Projeto Supabase</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

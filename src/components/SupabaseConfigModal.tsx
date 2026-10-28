@@ -14,7 +14,14 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [url, setUrl] = useState('');
   const [anonKey, setAnonKey] = useState('');
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string; tablesStatus?: Record<string, boolean> } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    clientInitialized?: boolean;
+    authEndpointOk?: boolean;
+    tablesStatus?: Record<string, boolean>;
+    allTablesReady?: boolean;
+  } | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
@@ -152,42 +159,61 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
           {activeTab === 'config' && (
             <>
-              {/* Status Banner */}
-              <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/70 flex items-start gap-2.5 sm:gap-3">
-                <div className="p-1.5 bg-emerald-500 text-white rounded-lg mt-0.5 shrink-0">
-                  <CheckCircle2 className="w-4 h-4" />
+              {/* Step by step guide */}
+              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 text-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs sm:text-sm">
+                  <Zap className="w-4 h-4 text-emerald-600" />
+                  <span>Passo a Passo para Conectar seu Novo Projeto Supabase</span>
                 </div>
-                <div className="text-xs sm:text-sm">
-                  <p className="font-semibold text-emerald-950">
-                    {isRealtimeActive ? 'Canal em Tempo Real Ativo!' : 'Conexão Supabase Configurada'}
-                  </p>
-                  <p className="text-xs text-emerald-800 mt-0.5">
-                    Os dados são transmitidos instantaneamente para todos os celulares e computadores conectados ao mesmo projeto Supabase.
-                  </p>
-                </div>
+                <ol className="text-xs space-y-1.5 text-slate-700 list-decimal list-inside pl-0.5">
+                  <li>
+                    Acesse o painel do Supabase em{' '}
+                    <a
+                      href="https://supabase.com/dashboard"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-700 font-semibold underline inline-flex items-center gap-0.5"
+                    >
+                      supabase.com/dashboard <ExternalLink className="w-3 h-3 inline" />
+                    </a>{' '}
+                    e abra seu novo projeto.
+                  </li>
+                  <li>
+                    Vá em <strong>Project Settings</strong> (ícone de engrenagem no menu lateral) &gt; <strong>API</strong>.
+                  </li>
+                  <li>
+                    Em <strong>Project URL</strong>, clique em <strong>Copy</strong> e cole no campo 1 abaixo.
+                  </li>
+                  <li>
+                    Em <strong>Project API Keys</strong>, copie a chave <strong>anon public</strong> e cole no campo 2 abaixo.
+                  </li>
+                  <li>
+                    Clique em <strong>Testar Conexão</strong>. O sistema irá inicializar o cliente Supabase e checar as tabelas.
+                  </li>
+                </ol>
               </div>
 
               {/* Form fields */}
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Project URL do Supabase
+                    1. Project URL do Supabase
                   </label>
                   <input
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://xyzcompany.supabase.co"
+                    placeholder="https://exemplo-novo-projeto.supabase.co"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                   />
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    No painel Supabase: Project Settings &gt; API &gt; Project URL
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    Exemplo: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">https://xxxxxxxxxxxx.supabase.co</code>
                   </span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Project API Key (Anon / Public)
+                    2. Project API Key (Anon / Public)
                   </label>
                   <input
                     type="password"
@@ -196,39 +222,88 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                   />
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    Chave pública com permissões anônimas de cliente (anon public)
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    Chave com papel <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">anon public</code> encontrada em Project API Keys
                   </span>
                 </div>
               </div>
 
-              {/* Test result */}
+              {/* Test result diagnostic panel */}
               {testResult && (
                 <div
-                  className={`p-3.5 rounded-xl text-xs flex flex-col gap-2 ${
+                  className={`p-4 rounded-xl text-xs flex flex-col gap-3 transition-all ${
                     testResult.success
-                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-900 border border-rose-200'
+                      ? testResult.allTablesReady !== false
+                        ? 'bg-emerald-50 text-emerald-950 border border-emerald-300'
+                        : 'bg-amber-50 text-amber-950 border border-amber-300'
+                      : 'bg-rose-50 text-rose-950 border border-rose-300'
                   }`}
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-2.5">
                     {testResult.success ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      testResult.allTablesReady !== false ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      )
                     ) : (
-                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                     )}
-                    <span>{testResult.message}</span>
+                    <div className="space-y-1">
+                      <p className="font-bold text-xs sm:text-sm">
+                        {testResult.success
+                          ? testResult.allTablesReady !== false
+                            ? 'Cliente Supabase Inicializado com Sucesso!'
+                            : 'Conectado! Tabelas pendentes de criação'
+                          : 'Falha na Validação da Conexão'}
+                      </p>
+                      <p className="leading-relaxed opacity-90">{testResult.message}</p>
+                    </div>
                   </div>
 
+                  {/* Tables checklist */}
                   {testResult.tablesStatus && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-2 border-t border-emerald-200/50">
-                      {Object.entries(testResult.tablesStatus).map(([tbl, ok]) => (
-                        <div key={tbl} className="flex items-center gap-1.5 text-[11px]">
-                          <span className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                          <span className="font-mono text-slate-700">{tbl}</span>
-                          <span className="text-[10px] text-slate-400">{ok ? '✓ OK' : '✕ pendente'}</span>
-                        </div>
-                      ))}
+                    <div className="pt-2 border-t border-slate-200/60">
+                      <p className="font-semibold mb-1.5 text-[11px] text-slate-700 uppercase tracking-wider">
+                        Verificação de Tabelas no Novo Projeto:
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {Object.entries(testResult.tablesStatus).map(([tbl, ok]) => (
+                          <div
+                            key={tbl}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono border ${
+                              ok
+                                ? 'bg-emerald-100/60 text-emerald-900 border-emerald-200'
+                                : 'bg-amber-100/60 text-amber-900 border-amber-200'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-600' : 'bg-amber-600'}`} />
+                            <span className="truncate">{tbl}</span>
+                            <span className="ml-auto text-[10px] font-sans font-bold">{ok ? '✓ Pronta' : '✕ Falta'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions if tables are missing */}
+                  {testResult.allTablesReady === false && (
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-200">
+                      <button
+                        type="button"
+                        onClick={handleCopySql}
+                        className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+                      >
+                        {copiedSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedSql ? 'SQL Copiado!' : 'Copiar Script SQL das Tabelas'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('sql')}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100/50 text-xs font-semibold transition-colors"
+                      >
+                        Ver Script SQL Completo
+                      </button>
                     </div>
                   )}
                 </div>
@@ -239,7 +314,7 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   href="https://supabase.com/dashboard"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-emerald-600 hover:text-emerald-700 font-medium inline-flex items-center gap-1 hover:underline"
+                  className="text-emerald-700 hover:text-emerald-800 font-semibold inline-flex items-center gap-1 hover:underline"
                 >
                   Abrir painel do Supabase <ExternalLink className="w-3 h-3" />
                 </a>
@@ -248,8 +323,9 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   onClick={() => {
                     setUrl('');
                     setAnonKey('');
+                    setTestResult(null);
                   }}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-slate-400 hover:text-slate-600 underline text-xs"
                 >
                   Limpar credenciais
                 </button>
