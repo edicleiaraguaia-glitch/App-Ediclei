@@ -11,6 +11,46 @@ export function getSavedConfig(): SupabaseConfig {
   const envUrl = import.meta.env.VITE_SUPABASE_URL;
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+  // 1. Check if URL hash or search parameters contain quick-connect credentials
+  try {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      let incomingUrl = '';
+      let incomingKey = '';
+
+      if (hash && hash.includes('sb_url=')) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        incomingUrl = hashParams.get('sb_url') || '';
+        incomingKey = hashParams.get('sb_key') || '';
+      } else if (search && search.includes('sb_url=')) {
+        const searchParams = new URLSearchParams(search);
+        incomingUrl = searchParams.get('sb_url') || '';
+        incomingKey = searchParams.get('sb_key') || '';
+      }
+
+      if (incomingUrl && incomingKey) {
+        const cleanUrl = decodeURIComponent(incomingUrl.trim());
+        const cleanKey = decodeURIComponent(incomingKey.trim());
+        const configToSave: SupabaseConfig = {
+          url: cleanUrl,
+          anonKey: cleanKey,
+          isConnected: true,
+          lastChecked: new Date().toISOString(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(configToSave));
+        // Clean URL hash to keep address clean and secure
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        return configToSave;
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao verificar parâmetros de conexão rápida:', err);
+  }
+
+  // 2. Check localStorage
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -23,11 +63,24 @@ export function getSavedConfig(): SupabaseConfig {
     console.warn('Erro ao carregar configuração salva do Supabase', err);
   }
 
+  // 3. Fallback to Vite env variables or defaults
   return {
     url: envUrl || DEFAULT_URL,
     anonKey: envKey || DEFAULT_KEY,
     isConnected: true,
   };
+}
+
+export function generateQuickConnectUrl(baseUrl?: string): string {
+  const config = getSavedConfig();
+  if (!config.url || !config.anonKey) return '';
+  const origin = baseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  return `${origin}#sb_url=${encodeURIComponent(config.url)}&sb_key=${encodeURIComponent(config.anonKey)}`;
+}
+
+export function getVercelEnvSnippet(): string {
+  const config = getSavedConfig();
+  return `VITE_SUPABASE_URL=${config.url || 'https://seu-projeto.supabase.co'}\nVITE_SUPABASE_ANON_KEY=${config.anonKey || 'sua-chave-anon'}`;
 }
 
 export function initSupabaseClient(config?: { url: string; anonKey: string }): SupabaseClient | null {

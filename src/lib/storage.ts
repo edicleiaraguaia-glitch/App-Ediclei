@@ -279,6 +279,16 @@ const INITIAL_CONFIG: WorkshopConfig = {
 // DB <-> APP MAPPERS (SNAKE_CASE <-> CAMELCASE)
 // ==========================================
 export function taskToDb(t: Task) {
+  const safeDate = (val?: string | null) => {
+    if (!val || typeof val !== 'string' || !val.trim()) return null;
+    try {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    } catch {
+      return null;
+    }
+  };
+
   return {
     id: t.id,
     title: t.title,
@@ -293,7 +303,7 @@ export function taskToDb(t: Task) {
     assigned_to: t.assignedTo || null,
     assigned_to_name: t.assignedToName || null,
     assigned_avatar: t.assignedAvatar || null,
-    due_date: t.dueDate || null,
+    due_date: safeDate(t.dueDate),
     checklist_items: t.checklistItems || [],
     estimated_hours: Number(t.estimatedHours || 0),
     actual_hours: Number(t.actualHours || 0),
@@ -301,9 +311,9 @@ export function taskToDb(t: Task) {
     tags: t.tags || [],
     notes: t.notes || null,
     photos: t.photos || [],
-    created_at: t.createdAt || new Date().toISOString(),
-    updated_at: t.updatedAt || new Date().toISOString(),
-    completed_at: t.completedAt || null,
+    created_at: safeDate(t.createdAt) || new Date().toISOString(),
+    updated_at: safeDate(t.updatedAt) || new Date().toISOString(),
+    completed_at: safeDate(t.completedAt),
   };
 }
 
@@ -387,13 +397,23 @@ export function dbToVehicle(r: any): Vehicle {
 }
 
 export function budgetToDb(b: Budget) {
+  let safeData = new Date().toISOString();
+  if (b.data && typeof b.data === 'string' && b.data.trim()) {
+    try {
+      const d = new Date(b.data);
+      if (!isNaN(d.getTime())) {
+        safeData = d.toISOString();
+      }
+    } catch {}
+  }
+
   return {
     id: b.id,
     numero: b.numero,
     cliente_id: b.clienteId,
     veiculo_id: b.veiculoId,
     checklist_id: b.checklistId || null,
-    data: b.data || new Date().toISOString(),
+    data: safeData,
     subtotal: Number(b.subtotal || 0),
     desconto: Number(b.desconto || 0),
     total: Number(b.total || 0),
@@ -480,6 +500,10 @@ export const StorageService = {
     return getLocal<Task[]>(KEYS.TASKS, INITIAL_TASKS);
   },
 
+  saveTasksLocally(tasks: Task[]): void {
+    setLocal(KEYS.TASKS, tasks);
+  },
+
   async saveTasks(tasks: Task[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.TASKS, tasks);
 
@@ -507,6 +531,10 @@ export const StorageService = {
     return getLocal<Client[]>(KEYS.CLIENTS, INITIAL_CLIENTS);
   },
 
+  saveClientsLocally(clients: Client[]): void {
+    setLocal(KEYS.CLIENTS, clients);
+  },
+
   async saveClients(clients: Client[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.CLIENTS, clients);
     const supabase = getSupabase();
@@ -529,6 +557,10 @@ export const StorageService = {
   // Vehicles
   getVehicles(): Vehicle[] {
     return getLocal<Vehicle[]>(KEYS.VEHICLES, INITIAL_VEHICLES);
+  },
+
+  saveVehiclesLocally(vehicles: Vehicle[]): void {
+    setLocal(KEYS.VEHICLES, vehicles);
   },
 
   async saveVehicles(vehicles: Vehicle[]): Promise<{ success: boolean; error?: string }> {
@@ -564,6 +596,10 @@ export const StorageService = {
     return getLocal<Budget[]>(KEYS.BUDGETS, []);
   },
 
+  saveBudgetsLocally(budgets: Budget[]): void {
+    setLocal(KEYS.BUDGETS, budgets);
+  },
+
   async saveBudgets(budgets: Budget[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.BUDGETS, budgets);
     const supabase = getSupabase();
@@ -595,6 +631,10 @@ export const StorageService = {
   // Workshop Config
   getConfig(): WorkshopConfig {
     return getLocal<WorkshopConfig>(KEYS.CONFIG, INITIAL_CONFIG);
+  },
+
+  saveConfigLocally(config: WorkshopConfig): void {
+    setLocal(KEYS.CONFIG, config);
   },
 
   async saveConfig(config: WorkshopConfig): Promise<{ success: boolean; error?: string }> {

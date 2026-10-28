@@ -1,7 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Task, Client, Vehicle, Budget, ServiceItem, WorkshopConfig, ActivityLog, Checklist, TaskStatus, TaskPriority, TaskCategory } from '../types';
-import { StorageService, dbToTask, dbToClient, dbToVehicle, dbToBudget, dbToConfig } from '../lib/storage';
+import {
+  StorageService,
+  dbToTask,
+  taskToDb,
+  dbToClient,
+  clientToDb,
+  dbToVehicle,
+  vehicleToDb,
+  dbToBudget,
+  budgetToDb,
+  dbToConfig,
+  configToDb,
+} from '../lib/storage';
 import { getSupabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -86,7 +98,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const supabase = getSupabase();
     if (!supabase) {
-      // Local realtime simulation
       setIsRealtimeActive(true);
       return;
     }
@@ -94,52 +105,93 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial fetch from Supabase if available
     const fetchRemote = async () => {
       try {
-        // 1. Fetch Tasks
-        const { data: remoteTasks, error: taskErr } = await supabase.from('tasks').select('*');
-        if (!taskErr && Array.isArray(remoteTasks)) {
-          const mapped = remoteTasks.map(dbToTask);
-          const currentLocal = StorageService.getTasks();
-          const remoteIds = new Set(mapped.map((t) => t.id));
-          const unuploaded = currentLocal.filter((t) => !remoteIds.has(t.id));
-          const merged = [...mapped, ...unuploaded];
-          setTasks(merged);
-          StorageService.saveTasks(merged);
-        }
-
-        // 2. Fetch Clients
+        // 1. Fetch Remote Clients
         const { data: remoteClients, error: clientErr } = await supabase.from('clients').select('*');
+        let currentClients = StorageService.getClients();
         if (!clientErr && Array.isArray(remoteClients)) {
           const mappedClients = remoteClients.map(dbToClient);
-          const currentClients = StorageService.getClients();
-          const remoteIds = new Set(mappedClients.map((c) => c.id));
-          const unuploaded = currentClients.filter((c) => !remoteIds.has(c.id));
-          const merged = [...mappedClients, ...unuploaded];
-          setClients(merged);
-          StorageService.saveClients(merged);
+          const remoteClientIds = new Set(mappedClients.map((c) => c.id));
+          const unuploadedClients = currentClients.filter((c) => !remoteClientIds.has(c.id));
+
+          // Auto-sync unuploaded clients to Supabase
+          if (unuploadedClients.length > 0) {
+            try {
+              await supabase.from('clients').upsert(unuploadedClients.map(clientToDb));
+            } catch (e) {
+              console.warn('Erro ao auto-sincronizar clientes antigos:', e);
+            }
+          }
+
+          const mergedClients = [...mappedClients, ...unuploadedClients];
+          setClients(mergedClients);
+          StorageService.saveClientsLocally(mergedClients);
+          currentClients = mergedClients;
         }
 
-        // 3. Fetch Vehicles
+        // 2. Fetch Remote Vehicles
         const { data: remoteVehicles, error: vehErr } = await supabase.from('vehicles').select('*');
+        let currentVehicles = StorageService.getVehicles();
         if (!vehErr && Array.isArray(remoteVehicles)) {
           const mappedVehicles = remoteVehicles.map(dbToVehicle);
-          const currentVehicles = StorageService.getVehicles();
-          const remoteIds = new Set(mappedVehicles.map((v) => v.id));
-          const unuploaded = currentVehicles.filter((v) => !remoteIds.has(v.id));
-          const merged = [...mappedVehicles, ...unuploaded];
-          setVehicles(merged);
-          StorageService.saveVehicles(merged);
+          const remoteVehIds = new Set(mappedVehicles.map((v) => v.id));
+          const unuploadedVehicles = currentVehicles.filter((v) => !remoteVehIds.has(v.id));
+
+          // Auto-sync unuploaded vehicles to Supabase
+          if (unuploadedVehicles.length > 0) {
+            try {
+              await supabase.from('vehicles').upsert(unuploadedVehicles.map(vehicleToDb));
+            } catch (e) {
+              console.warn('Erro ao auto-sincronizar veículos antigos:', e);
+            }
+          }
+
+          const mergedVehicles = [...mappedVehicles, ...unuploadedVehicles];
+          setVehicles(mergedVehicles);
+          StorageService.saveVehiclesLocally(mergedVehicles);
+          currentVehicles = mergedVehicles;
         }
 
-        // 4. Fetch Budgets
+        // 3. Fetch Remote Tasks (Work Orders)
+        const { data: remoteTasks, error: taskErr } = await supabase.from('tasks').select('*');
+        if (!taskErr && Array.isArray(remoteTasks)) {
+          const mappedTasks = remoteTasks.map(dbToTask);
+          const currentLocalTasks = StorageService.getTasks();
+          const remoteTaskIds = new Set(mappedTasks.map((t) => t.id));
+          const unuploadedTasks = currentLocalTasks.filter((t) => !remoteTaskIds.has(t.id));
+
+          // Auto-sync unuploaded tasks (old service orders!) to Supabase
+          if (unuploadedTasks.length > 0) {
+            try {
+              await supabase.from('tasks').upsert(unuploadedTasks.map(taskToDb));
+            } catch (e) {
+              console.warn('Erro ao auto-sincronizar ordens de serviço antigas:', e);
+            }
+          }
+
+          const mergedTasks = [...mappedTasks, ...unuploadedTasks];
+          setTasks(mergedTasks);
+          StorageService.saveTasksLocally(mergedTasks);
+        }
+
+        // 4. Fetch Remote Budgets
         const { data: remoteBudgets, error: budgErr } = await supabase.from('budgets').select('*');
         if (!budgErr && Array.isArray(remoteBudgets)) {
           const mappedBudgets = remoteBudgets.map(dbToBudget);
           const currentBudgets = StorageService.getBudgets();
-          const remoteIds = new Set(mappedBudgets.map((b) => b.id));
-          const unuploaded = currentBudgets.filter((b) => !remoteIds.has(b.id));
-          const merged = [...mappedBudgets, ...unuploaded];
-          setBudgets(merged);
-          StorageService.saveBudgets(merged);
+          const remoteBudgetIds = new Set(mappedBudgets.map((b) => b.id));
+          const unuploadedBudgets = currentBudgets.filter((b) => !remoteBudgetIds.has(b.id));
+
+          if (unuploadedBudgets.length > 0) {
+            try {
+              await supabase.from('budgets').upsert(unuploadedBudgets.map(budgetToDb));
+            } catch (e) {
+              console.warn('Erro ao auto-sincronizar orçamentos antigos:', e);
+            }
+          }
+
+          const mergedBudgets = [...mappedBudgets, ...unuploadedBudgets];
+          setBudgets(mergedBudgets);
+          StorageService.saveBudgetsLocally(mergedBudgets);
         }
 
         // 5. Fetch Workshop Config
@@ -152,7 +204,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!cfgErr && remoteConfig) {
           const mappedConfig = dbToConfig(remoteConfig);
           setConfig(mappedConfig);
-          StorageService.saveConfig(mappedConfig);
+          StorageService.saveConfigLocally(mappedConfig);
+        } else if (!remoteConfig) {
+          // If remote config is empty, initialize it on Supabase with local config
+          const localCfg = StorageService.getConfig();
+          try {
+            await supabase.from('workshop_config').upsert([configToDb(localCfg)]);
+          } catch (e) {
+            console.warn('Erro ao inicializar configuração no Supabase:', e);
+          }
         }
       } catch (err) {
         console.warn('Supabase fetchRemote err:', err);
@@ -603,11 +663,46 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const currentLocal = StorageService.getTasks();
           const remoteIds = new Set(mapped.map((t) => t.id));
           const unuploaded = currentLocal.filter((t) => !remoteIds.has(t.id));
+
+          if (unuploaded.length > 0) {
+            await supabase.from('tasks').upsert(unuploaded.map(taskToDb));
+          }
+
           const merged = [...mapped, ...unuploaded];
           setTasks(merged);
-          StorageService.saveTasks(merged);
+          StorageService.saveTasksLocally(merged);
         }
-      } catch {}
+
+        const { data: remoteClients } = await supabase.from('clients').select('*');
+        if (Array.isArray(remoteClients)) {
+          const mappedClients = remoteClients.map(dbToClient);
+          setClients(mappedClients);
+          StorageService.saveClientsLocally(mappedClients);
+        }
+
+        const { data: remoteVehicles } = await supabase.from('vehicles').select('*');
+        if (Array.isArray(remoteVehicles)) {
+          const mappedVehicles = remoteVehicles.map(dbToVehicle);
+          setVehicles(mappedVehicles);
+          StorageService.saveVehiclesLocally(mappedVehicles);
+        }
+
+        const { data: remoteBudgets } = await supabase.from('budgets').select('*');
+        if (Array.isArray(remoteBudgets)) {
+          const mappedBudgets = remoteBudgets.map(dbToBudget);
+          setBudgets(mappedBudgets);
+          StorageService.saveBudgetsLocally(mappedBudgets);
+        }
+
+        const { data: remoteConfig } = await supabase.from('workshop_config').select('*').limit(1).maybeSingle();
+        if (remoteConfig) {
+          const mappedConfig = dbToConfig(remoteConfig);
+          setConfig(mappedConfig);
+          StorageService.saveConfigLocally(mappedConfig);
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar dados do Supabase:', err);
+      }
     }
   };
 

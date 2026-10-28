@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Database, CheckCircle2, AlertCircle, Copy, ExternalLink, RefreshCw, X, ShieldCheck, Zap, ArrowUpCircle, Check } from 'lucide-react';
-import { getSavedConfig, saveSupabaseConfig, testSupabaseConnection, getSupabaseSchemaSql } from '../lib/supabase';
+import { Database, CheckCircle2, AlertCircle, Copy, ExternalLink, RefreshCw, X, ShieldCheck, Zap, ArrowUpCircle, Check, Smartphone, Share2, Code } from 'lucide-react';
+import { getSavedConfig, saveSupabaseConfig, testSupabaseConnection, getSupabaseSchemaSql, generateQuickConnectUrl, getVercelEnvSnippet } from '../lib/supabase';
 import { StorageService } from '../lib/storage';
 import { useTasks } from '../context/TaskContext';
 
@@ -16,7 +16,9 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; tablesStatus?: Record<string, boolean> } | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
-  const [activeTab, setActiveTab] = useState<'config' | 'migration' | 'sql'>('config');
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedEnv, setCopiedEnv] = useState(false);
+  const [activeTab, setActiveTab] = useState<'config' | 'migration' | 'sql' | 'multidevice'>('config');
 
   // Migration states
   const [syncing, setSyncing] = useState(false);
@@ -133,6 +135,16 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" /> Script SQL (Tabelas)
+          </button>
+          <button
+            onClick={() => setActiveTab('multidevice')}
+            className={`pb-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'multidevice'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" /> Celular & Vercel
           </button>
         </div>
 
@@ -346,6 +358,73 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <pre className="p-3 bg-slate-900 text-emerald-400 rounded-xl text-xs font-mono overflow-x-auto max-h-72 border border-slate-800">
                 {getSupabaseSchemaSql()}
               </pre>
+            </div>
+          )}
+
+          {activeTab === 'multidevice' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/70 text-indigo-900 text-xs sm:text-sm">
+                <p className="font-bold text-indigo-950 mb-1">
+                  Como Compartilhar os Dados entre Dispositivos (Celular e PC)
+                </p>
+                <p className="text-xs text-indigo-800 leading-relaxed">
+                  Para que o aplicativo no seu smartphone Android ou em outro computador visualize <strong>as mesmas ordens de serviço e o mesmo banco de clientes</strong>, o outro dispositivo precisa estar conectado ao mesmo projeto Supabase.
+                </p>
+              </div>
+
+              {/* Method 1: Instant Quick Connect Link */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-emerald-600" />
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-800">
+                    Método 1: Link de Conexão Rápida para o Celular (WhatsApp)
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Envie este link para você mesmo pelo WhatsApp ou abra no navegador do seu smartphone. Ao carregar a página por este link, o celular salva as credenciais e se conecta instantaneamente sem precisar digitar nada:
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = generateQuickConnectUrl();
+                    navigator.clipboard.writeText(link);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2500);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs"
+                >
+                  {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedLink ? 'Link Copiado! Envie no WhatsApp ou abra no Celular' : 'Copiar Link de Conexão para o Celular'}
+                </button>
+              </div>
+
+              {/* Method 2: Vercel Environment Variables */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4 text-blue-600" />
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-800">
+                    Método 2: Configuração Definitiva na Vercel (Recomendado)
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Configure as variáveis no painel da Vercel (<strong>Project &gt; Settings &gt; Environment Variables</strong>). Assim, qualquer pessoa ou celular que abrir o site já estará automaticamente conectado sem nenhuma configuração manual:
+                </p>
+                <pre className="p-3 bg-slate-900 text-emerald-300 rounded-xl text-xs font-mono overflow-x-auto border border-slate-800">
+                  {getVercelEnvSnippet()}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(getVercelEnvSnippet());
+                    setCopiedEnv(true);
+                    setTimeout(() => setCopiedEnv(false), 2500);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs"
+                >
+                  {copiedEnv ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedEnv ? 'Variáveis Copiadas!' : 'Copiar Variáveis de Ambiente para Vercel'}
+                </button>
+              </div>
             </div>
           )}
         </div>
