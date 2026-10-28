@@ -39,38 +39,38 @@ export const Header: React.FC<Props> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16 gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {config.logo ? (
-              <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-xs shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border border-slate-200 p-0.5 flex items-center justify-center overflow-hidden shadow-xs shrink-0">
                 <img src={config.logo} alt={config.nome} className="w-full h-full object-contain" />
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-800 text-white flex items-center justify-center shadow-md shadow-blue-800/20 shrink-0">
-                <Wrench className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-800 text-white flex items-center justify-center shadow-xs shrink-0">
+                <Wrench className="w-4 h-4 text-white" />
               </div>
             )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-slate-900 text-base leading-tight">
-                  {config.nome || 'Oficina & Tarefas'}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="font-bold text-slate-900 text-sm sm:text-base leading-tight truncate max-w-[125px] xs:max-w-[170px] sm:max-w-none">
+                  {config.nome || 'Oficina Evaldo Pinturas'}
                 </h1>
                 {/* Live Realtime Indicator */}
                 <div
                   onClick={onOpenSupabaseModal}
-                  className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold cursor-pointer hover:bg-emerald-100 transition-colors"
+                  className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] sm:text-[10px] font-bold cursor-pointer hover:bg-emerald-100 transition-colors shrink-0"
                   title="Clique para gerenciar o Supabase e Realtime"
                 >
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  <span>Tempo Real</span>
+                  <span className="hidden xs:inline">Tempo Real</span>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-500 hidden sm:block">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 hidden sm:block truncate">
                 Gestão de Pendências de Funilaria, Pintura & Mecânica
               </p>
             </div>
@@ -140,21 +140,22 @@ export const Header: React.FC<Props> = ({
           </nav>
 
           {/* Right Action Icons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Supabase Button */}
             <button
               onClick={onOpenSupabaseModal}
-              className="px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              title="Configurar Conexão com Supabase"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title="Configurar Conexão com Supabase e Sincronização"
             >
               <Database className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden lg:inline">Supabase</span>
+              <span className="hidden md:inline">Supabase</span>
             </button>
 
             {/* Quick Add Task */}
             <button
               onClick={onOpenNewTask}
-              className="px-3 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-700/20 transition-all hover:scale-105 active:scale-95"
+              className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center gap-1 shadow-sm shadow-blue-700/20 transition-all hover:scale-105 active:scale-95"
+              title="Nova Tarefa ou Pendência"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Nova Tarefa</span>
@@ -163,7 +164,7 @@ export const Header: React.FC<Props> = ({
             {/* Settings */}
             <button
               onClick={onOpenSettingsModal}
-              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+              className="p-1.5 sm:p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
               title="Configurações da Oficina"
             >
               <Settings className="w-4 h-4" />

@@ -1,6 +1,6 @@
 {
-  "name": "Oficina & Tarefas - Gestor de Pendências",
-  "description": "Aplicativo de gestão de tarefas e pendências em tempo real integrado com Supabase, autenticação e painel de progresso.",
+  "name": "Oficina Evaldo Pinturas - Gestor de Tarefas",
+  "description": "Aplicativo de gestão de tarefas, funilaria e pendências em tempo real integrado com Supabase, autenticação e painel de progresso.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

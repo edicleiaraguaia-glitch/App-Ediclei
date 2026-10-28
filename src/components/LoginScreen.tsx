@@ -36,26 +36,26 @@ export const LoginScreen: React.FC = () => {
       if (!res.success) {
         setError(res.error || 'Erro ao realizar o cadastro. Tente novamente.');
       } else {
-        setSuccessMessage('Conta cadastrada e sincronizada com sucesso no Supabase!');
+        setSuccessMessage(res.error || 'Conta cadastrada com sucesso no Supabase Authentication!');
       }
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 flex items-center justify-center p-3 sm:p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
         {/* Top Header */}
-        <div className="p-8 text-center bg-gradient-to-b from-blue-50 to-white border-b border-slate-100">
-          <div className="w-16 h-16 rounded-2xl bg-blue-700 text-white flex items-center justify-center mx-auto shadow-xl shadow-blue-700/30 mb-4">
-            <Wrench className="w-8 h-8" />
+        <div className="p-6 sm:p-8 text-center bg-gradient-to-b from-blue-50 to-white border-b border-slate-100">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-700 text-white flex items-center justify-center mx-auto shadow-xl shadow-blue-700/30 mb-3 sm:mb-4">
+            <Wrench className="w-7 h-7 sm:w-8 sm:h-8" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">OficinaApp</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Oficina Evaldo Pinturas</h2>
           <p className="text-xs text-slate-500 mt-1">Gestor de Tarefas, Funilaria & Pendências em Tempo Real</p>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold mt-3">
             <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Autenticação Integrada ao Supabase</span>
+            <span>Autenticação Supabase Auth (Users)</span>
           </div>
         </div>
 

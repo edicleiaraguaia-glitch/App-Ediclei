@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Task, Client, Vehicle, Budget, ServiceItem, WorkshopConfig, ActivityLog, Checklist, TaskStatus, TaskPriority, TaskCategory } from '../types';
-import { StorageService } from '../lib/storage';
+import { StorageService, dbToTask, dbToClient, dbToVehicle, dbToBudget, dbToConfig } from '../lib/storage';
 import { getSupabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -94,40 +94,65 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial fetch from Supabase if available
     const fetchRemote = async () => {
       try {
+        // 1. Fetch Tasks
         const { data: remoteTasks, error: taskErr } = await supabase.from('tasks').select('*');
-        if (!taskErr && remoteTasks && remoteTasks.length > 0) {
-          const mapped: Task[] = remoteTasks.map((r: any) => ({
-            id: r.id,
-            title: r.title,
-            description: r.description,
-            category: r.category,
-            priority: r.priority,
-            status: r.status,
-            clientName: r.client_name,
-            clientPhone: r.client_phone,
-            vehiclePlate: r.vehicle_plate,
-            vehicleModel: r.vehicle_model,
-            assignedTo: r.assigned_to,
-            assignedToName: r.assigned_to_name,
-            assignedAvatar: r.assigned_avatar,
-            dueDate: r.due_date,
-            checklistItems: r.checklist_items || [],
-            estimatedHours: Number(r.estimated_hours || 0),
-            actualHours: Number(r.actual_hours || 0),
-            cost: Number(r.cost || 0),
-            tags: r.tags || [],
-            notes: r.notes,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-            completedAt: r.completed_at,
-          }));
-          setTasks(mapped);
-          StorageService.saveTasks(mapped);
+        if (!taskErr && Array.isArray(remoteTasks)) {
+          const mapped = remoteTasks.map(dbToTask);
+          const currentLocal = StorageService.getTasks();
+          const remoteIds = new Set(mapped.map((t) => t.id));
+          const unuploaded = currentLocal.filter((t) => !remoteIds.has(t.id));
+          const merged = [...mapped, ...unuploaded];
+          setTasks(merged);
+          StorageService.saveTasks(merged);
         }
 
-        const { data: remoteClients } = await supabase.from('clients').select('*');
-        if (remoteClients && remoteClients.length > 0) {
-          setClients(remoteClients);
+        // 2. Fetch Clients
+        const { data: remoteClients, error: clientErr } = await supabase.from('clients').select('*');
+        if (!clientErr && Array.isArray(remoteClients)) {
+          const mappedClients = remoteClients.map(dbToClient);
+          const currentClients = StorageService.getClients();
+          const remoteIds = new Set(mappedClients.map((c) => c.id));
+          const unuploaded = currentClients.filter((c) => !remoteIds.has(c.id));
+          const merged = [...mappedClients, ...unuploaded];
+          setClients(merged);
+          StorageService.saveClients(merged);
+        }
+
+        // 3. Fetch Vehicles
+        const { data: remoteVehicles, error: vehErr } = await supabase.from('vehicles').select('*');
+        if (!vehErr && Array.isArray(remoteVehicles)) {
+          const mappedVehicles = remoteVehicles.map(dbToVehicle);
+          const currentVehicles = StorageService.getVehicles();
+          const remoteIds = new Set(mappedVehicles.map((v) => v.id));
+          const unuploaded = currentVehicles.filter((v) => !remoteIds.has(v.id));
+          const merged = [...mappedVehicles, ...unuploaded];
+          setVehicles(merged);
+          StorageService.saveVehicles(merged);
+        }
+
+        // 4. Fetch Budgets
+        const { data: remoteBudgets, error: budgErr } = await supabase.from('budgets').select('*');
+        if (!budgErr && Array.isArray(remoteBudgets)) {
+          const mappedBudgets = remoteBudgets.map(dbToBudget);
+          const currentBudgets = StorageService.getBudgets();
+          const remoteIds = new Set(mappedBudgets.map((b) => b.id));
+          const unuploaded = currentBudgets.filter((b) => !remoteIds.has(b.id));
+          const merged = [...mappedBudgets, ...unuploaded];
+          setBudgets(merged);
+          StorageService.saveBudgets(merged);
+        }
+
+        // 5. Fetch Workshop Config
+        const { data: remoteConfig, error: cfgErr } = await supabase
+          .from('workshop_config')
+          .select('*')
+          .limit(1)
+          .maybeSingle();
+
+        if (!cfgErr && remoteConfig) {
+          const mappedConfig = dbToConfig(remoteConfig);
+          setConfig(mappedConfig);
+          StorageService.saveConfig(mappedConfig);
         }
       } catch (err) {
         console.warn('Supabase fetchRemote err:', err);
@@ -138,9 +163,24 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Subscribe to real-time changes
     const channel = supabase
-      .channel('tasks_realtime_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-        console.log('Realtime change received from Supabase:', payload);
+      .channel('oficina_realtime_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        fetchRemote();
+        setLastUpdated(new Date());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        fetchRemote();
+        setLastUpdated(new Date());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, () => {
+        fetchRemote();
+        setLastUpdated(new Date());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
+        fetchRemote();
+        setLastUpdated(new Date());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workshop_config' }, () => {
         fetchRemote();
         setLastUpdated(new Date());
       })
@@ -554,6 +594,21 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshData = async () => {
     reloadFromLocal();
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data: remoteTasks, error } = await supabase.from('tasks').select('*');
+        if (!error && Array.isArray(remoteTasks)) {
+          const mapped = remoteTasks.map(dbToTask);
+          const currentLocal = StorageService.getTasks();
+          const remoteIds = new Set(mapped.map((t) => t.id));
+          const unuploaded = currentLocal.filter((t) => !remoteIds.has(t.id));
+          const merged = [...mapped, ...unuploaded];
+          setTasks(merged);
+          StorageService.saveTasks(merged);
+        }
+      } catch {}
+    }
   };
 
   return (

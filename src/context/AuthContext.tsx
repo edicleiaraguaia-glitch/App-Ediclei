@@ -141,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const supabase = getSupabase();
 
-    // 1. Try Supabase Auth first
+    // 1. Authenticate with Supabase Auth
     if (supabase) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -149,7 +149,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password: cleanPass,
         });
 
-        if (!error && data?.user) {
+        if (error) {
+          const lowerMsg = error.message.toLowerCase();
+          if (lowerMsg.includes('email not confirmed')) {
+            return {
+              success: false,
+              error: 'E-mail cadastrado no Supabase, mas ainda pendente de confirmação. Verifique sua caixa postal ou desative "Confirm email" no painel Supabase (Authentication -> Providers -> Email).',
+            };
+          }
+
+          if (lowerMsg.includes('invalid login credentials')) {
+            // Check if user previously registered only in localStorage
+            const localAccounts = getRegisteredAccounts();
+            const matchedLocal = localAccounts.find((acc) => acc.email.toLowerCase() === cleanEmail);
+
+            if (matchedLocal && matchedLocal.passwordHash === cleanPass) {
+              // Attempt to migrate this local user into Supabase Auth!
+              const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+                email: cleanEmail,
+                password: cleanPass,
+                options: {
+                  data: { name: matchedLocal.name, role: matchedLocal.role },
+                },
+              });
+
+              if (!signUpErr && signUpData?.user) {
+                // Upsert to profiles table
+                await supabase.from('profiles').upsert([
+                  {
+                    id: signUpData.user.id,
+                    email: cleanEmail,
+                    name: matchedLocal.name,
+                    role: matchedLocal.role,
+                    created_at: new Date().toISOString(),
+                  },
+                ]);
+
+                if (signUpData.session) {
+                  const profile: UserProfile = {
+                    id: signUpData.user.id,
+                    email: cleanEmail,
+                    name: matchedLocal.name,
+                    role: matchedLocal.role,
+                  };
+                  setUser(profile);
+                  setIsSupabaseAuth(true);
+                  localStorage.setItem(USER_SESSION_KEY, JSON.stringify(profile));
+                  return { success: true };
+                }
+
+                return {
+                  success: false,
+                  error: 'Sua conta antiga foi cadastrada agora no Supabase Authentication! Se o Supabase exigir confirmação de e-mail, autorize pelo link enviado ou desative "Confirm email" no painel Supabase.',
+                };
+              }
+            }
+
+            return {
+              success: false,
+              error: 'E-mail ou senha incorretos. Verifique suas credenciais no Supabase.',
+            };
+          }
+
+          return { success: false, error: `Erro no Supabase: ${error.message}` };
+        }
+
+        if (data?.user) {
           const profile: UserProfile = {
             id: data.user.id,
             email: data.user.email || cleanEmail,
@@ -162,23 +227,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem(USER_SESSION_KEY, JSON.stringify(profile));
           return { success: true };
         }
-      } catch (authErr) {
-        console.warn('Tentativa no Supabase Auth falhou, verificando base de dados:', authErr);
+      } catch (authErr: any) {
+        console.error('Falha de conexão com Supabase Auth:', authErr);
+        return { success: false, error: `Falha ao conectar no Supabase: ${authErr.message || 'Verifique sua conexão'}` };
       }
     }
 
-    // 2. Validate against registered accounts registry
+    // 2. Offline fallback ONLY if Supabase is completely unavailable/not configured
     const accounts = getRegisteredAccounts();
     const matchedAccount = accounts.find((acc) => acc.email.toLowerCase() === cleanEmail);
 
     if (!matchedAccount) {
       return {
         success: false,
-        error: 'E-mail ou usuário não cadastrado. Por favor, crie uma conta primeiro.',
+        error: 'E-mail não cadastrado no Supabase. Por favor, crie uma conta primeiro.',
       };
     }
 
-    // Strict password comparison
     if (matchedAccount.passwordHash !== cleanPass) {
       return {
         success: false,
@@ -186,7 +251,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Login successful
     const userProfile: UserProfile = {
       id: matchedAccount.id,
       email: matchedAccount.email,
@@ -225,11 +289,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
     }
 
-    // Check if already registered
+    const supabase = getSupabase();
+
+    // 1. Register with Supabase Auth
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: cleanPass,
+          options: {
+            data: { name: cleanName, role },
+          },
+        });
+
+        if (error) {
+          let errorMsg = error.message;
+          if (error.message.includes('User already registered') || error.message.includes('already exists')) {
+            errorMsg = 'Este e-mail já está cadastrado no Supabase. Faça login com sua senha.';
+          }
+          return { success: false, error: `Erro no Supabase: ${errorMsg}` };
+        }
+
+        if (data?.user) {
+          // Record in public.profiles table in Supabase
+          try {
+            await supabase.from('profiles').upsert([
+              {
+                id: data.user.id,
+                email: cleanEmail,
+                name: cleanName,
+                role,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+          } catch (profErr) {
+            console.warn('Aviso ao registrar na tabela profiles:', profErr);
+          }
+
+          // Cache in local accounts registry for offline backup
+          const existingAccounts = getRegisteredAccounts();
+          const newAccount: RegisteredUserAccount = {
+            id: data.user.id,
+            email: cleanEmail,
+            passwordHash: cleanPass,
+            name: cleanName,
+            role,
+            createdAt: new Date().toISOString(),
+          };
+          saveRegisteredAccounts([...existingAccounts.filter(a => a.email !== cleanEmail), newAccount]);
+
+          // Check if session was granted or email confirmation required
+          if (!data.session) {
+            return {
+              success: true,
+              error: 'Usuário cadastrado com sucesso no Supabase! Verifique seu e-mail caso a confirmação esteja ativada no painel Supabase (Authentication -> Providers -> Email).',
+            };
+          }
+
+          // Active session immediately available
+          const userProfile: UserProfile = {
+            id: data.user.id,
+            email: cleanEmail,
+            name: cleanName,
+            role,
+          };
+
+          setUser(userProfile);
+          setIsSupabaseAuth(true);
+          localStorage.setItem(USER_SESSION_KEY, JSON.stringify(userProfile));
+
+          return { success: true };
+        }
+      } catch (err: any) {
+        return { success: false, error: `Falha ao registrar no Supabase: ${err.message || 'Erro de conexão'}` };
+      }
+    }
+
+    // 2. Offline Mode
     const existingAccounts = getRegisteredAccounts();
     const isAlreadyRegistered = existingAccounts.some((acc) => acc.email.toLowerCase() === cleanEmail);
     if (isAlreadyRegistered) {
-      return { success: false, error: 'Este e-mail já está cadastrado. Por favor, faça login.' };
+      return { success: false, error: 'Este e-mail já está cadastrado localmente. Por favor, faça login.' };
     }
 
     const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
@@ -242,42 +382,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
 
-    // 1. Register with Supabase
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        // Try Supabase Auth
-        await supabase.auth.signUp({
-          email: cleanEmail,
-          password: cleanPass,
-          options: {
-            data: { name: cleanName, role },
-          },
-        });
-      } catch (err) {
-        console.warn('Supabase auth signUp background notice:', err);
-      }
-
-      // Try recording in Supabase profiles/sync
-      try {
-        await supabase.from('profiles').upsert([
-          {
-            id: newUserId,
-            email: cleanEmail,
-            name: cleanName,
-            role,
-            created_at: newAccount.createdAt,
-          },
-        ]);
-      } catch (err) {
-        console.warn('Supabase profiles upsert notice:', err);
-      }
-    }
-
-    // 2. Persist in registered users registry
     saveRegisteredAccounts([...existingAccounts, newAccount]);
 
-    // 3. Create active session for the registered user
     const userProfile: UserProfile = {
       id: newUserId,
       email: cleanEmail,

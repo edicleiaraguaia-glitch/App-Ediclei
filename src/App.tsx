@@ -62,7 +62,7 @@ function MainAppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-20 md:pb-12">
+    <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-28 md:pb-12">
       {/* Sticky Header */}
       <Header
         activeTab={activeTab}

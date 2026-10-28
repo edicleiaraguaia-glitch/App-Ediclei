@@ -267,20 +267,197 @@ const INITIAL_ACTIVITIES: ActivityLog[] = [
 ];
 
 const INITIAL_CONFIG: WorkshopConfig = {
-  nome: 'Oficina Master Auto Center',
+  nome: 'Oficina Evaldo Pinturas',
   cnpj: '34.890.123/0001-45',
   tel: '(11) 99876-5432',
-  end: 'Av. das Nações Unidas, 8500 - Pinheiros, São Paulo/SP',
+  end: 'Av. Principal, 1000 - Centro',
   validade: 15,
   pagto: 'Pix, Cartão de Crédito até 6x, Boleto Bancário e Faturamento para Frotistas',
 };
+
+// ==========================================
+// DB <-> APP MAPPERS (SNAKE_CASE <-> CAMELCASE)
+// ==========================================
+export function taskToDb(t: Task) {
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description || null,
+    category: t.category,
+    priority: t.priority,
+    status: t.status,
+    client_name: t.clientName || null,
+    client_phone: t.clientPhone || null,
+    vehicle_plate: t.vehiclePlate || null,
+    vehicle_model: t.vehicleModel || null,
+    assigned_to: t.assignedTo || null,
+    assigned_to_name: t.assignedToName || null,
+    assigned_avatar: t.assignedAvatar || null,
+    due_date: t.dueDate || null,
+    checklist_items: t.checklistItems || [],
+    estimated_hours: Number(t.estimatedHours || 0),
+    actual_hours: Number(t.actualHours || 0),
+    cost: Number(t.cost || 0),
+    tags: t.tags || [],
+    notes: t.notes || null,
+    photos: t.photos || [],
+    created_at: t.createdAt || new Date().toISOString(),
+    updated_at: t.updatedAt || new Date().toISOString(),
+    completed_at: t.completedAt || null,
+  };
+}
+
+export function dbToTask(r: any): Task {
+  return {
+    id: r.id,
+    title: r.title,
+    description: r.description || undefined,
+    category: r.category || 'funilaria',
+    priority: r.priority || 'media',
+    status: r.status || 'pendente',
+    clientName: r.client_name || undefined,
+    clientPhone: r.client_phone || undefined,
+    vehiclePlate: r.vehicle_plate || undefined,
+    vehicleModel: r.vehicle_model || undefined,
+    assignedTo: r.assigned_to || undefined,
+    assignedToName: r.assigned_to_name || undefined,
+    assignedAvatar: r.assigned_avatar || undefined,
+    dueDate: r.due_date || undefined,
+    checklistItems: Array.isArray(r.checklist_items) ? r.checklist_items : [],
+    estimatedHours: Number(r.estimated_hours || 0),
+    actualHours: Number(r.actual_hours || 0),
+    cost: Number(r.cost || 0),
+    tags: Array.isArray(r.tags) ? r.tags : [],
+    notes: r.notes || undefined,
+    photos: Array.isArray(r.photos) ? r.photos : [],
+    createdAt: r.created_at || new Date().toISOString(),
+    updatedAt: r.updated_at || new Date().toISOString(),
+    completedAt: r.completed_at || undefined,
+  };
+}
+
+export function clientToDb(c: Client) {
+  return {
+    id: c.id,
+    nome: c.nome,
+    doc: c.doc || null,
+    tel: c.tel,
+    email: c.email || null,
+    end: c.end || null,
+    created_at: c.createdAt || new Date().toISOString(),
+  };
+}
+
+export function dbToClient(r: any): Client {
+  return {
+    id: r.id,
+    nome: r.nome,
+    doc: r.doc || undefined,
+    tel: r.tel || '',
+    email: r.email || undefined,
+    end: r.end || undefined,
+    createdAt: r.created_at || new Date().toISOString(),
+  };
+}
+
+export function vehicleToDb(v: Vehicle) {
+  return {
+    id: v.id,
+    cliente_id: v.clienteId,
+    placa: v.placa,
+    marca: v.marca,
+    modelo: v.modelo,
+    ano: v.ano || null,
+    cor: v.cor || null,
+    km: v.km || null,
+  };
+}
+
+export function dbToVehicle(r: any): Vehicle {
+  return {
+    id: r.id,
+    clienteId: r.cliente_id || '',
+    placa: r.placa,
+    marca: r.marca,
+    modelo: r.modelo,
+    ano: r.ano || undefined,
+    cor: r.cor || undefined,
+    km: r.km || undefined,
+  };
+}
+
+export function budgetToDb(b: Budget) {
+  return {
+    id: b.id,
+    numero: b.numero,
+    cliente_id: b.clienteId,
+    veiculo_id: b.veiculoId,
+    checklist_id: b.checklistId || null,
+    data: b.data || new Date().toISOString(),
+    subtotal: Number(b.subtotal || 0),
+    desconto: Number(b.desconto || 0),
+    total: Number(b.total || 0),
+    status: b.status || 'rascunho',
+    itens: b.itens || [],
+    fotos: b.fotos || [],
+  };
+}
+
+export function dbToBudget(r: any): Budget {
+  return {
+    id: r.id,
+    numero: Number(r.numero || 1),
+    clienteId: r.cliente_id || '',
+    veiculoId: r.veiculo_id || '',
+    checklistId: r.checklist_id || undefined,
+    data: r.data || new Date().toISOString(),
+    subtotal: Number(r.subtotal || 0),
+    desconto: Number(r.desconto || 0),
+    total: Number(r.total || 0),
+    status: r.status || 'rascunho',
+    itens: Array.isArray(r.itens) ? r.itens : [],
+    fotos: Array.isArray(r.fotos) ? r.fotos : [],
+  };
+}
+
+export function configToDb(cfg: WorkshopConfig) {
+  return {
+    id: 'config_default',
+    nome: cfg.nome || 'Oficina Evaldo Pinturas',
+    cnpj: cfg.cnpj || null,
+    tel: cfg.tel || null,
+    end: cfg.end || null,
+    logo: cfg.logo || null,
+    validade: cfg.validade || 15,
+    pagto: cfg.pagto || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export function dbToConfig(r: any): WorkshopConfig {
+  return {
+    nome: r.nome || 'Oficina Evaldo Pinturas',
+    cnpj: r.cnpj || '',
+    tel: r.tel || '',
+    end: r.end || '',
+    logo: r.logo || undefined,
+    validade: Number(r.validade || 15),
+    pagto: r.pagto || '',
+  };
+}
 
 // Storage Helpers
 function getLocal<T>(key: string, defaultValue: T): T {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return defaultValue;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // If it's config and still has old generic default name, upgrade to Oficina Evaldo Pinturas
+    if (key === KEYS.CONFIG && parsed && parsed.nome === 'Oficina Master Auto Center') {
+      parsed.nome = 'Oficina Evaldo Pinturas';
+      localStorage.setItem(key, JSON.stringify(parsed));
+    }
+    return parsed;
   } catch (err) {
     console.error(`Erro ao ler localStorage ${key}:`, err);
     return defaultValue;
@@ -303,44 +480,26 @@ export const StorageService = {
     return getLocal<Task[]>(KEYS.TASKS, INITIAL_TASKS);
   },
 
-  async saveTasks(tasks: Task[]): Promise<void> {
+  async saveTasks(tasks: Task[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.TASKS, tasks);
 
     // Sync to Supabase if connected
     const supabase = getSupabase();
     if (supabase) {
       try {
-        // Upsert tasks in Supabase in background
-        const formatted = tasks.map(t => ({
-          id: t.id,
-          title: t.title,
-          description: t.description,
-          category: t.category,
-          priority: t.priority,
-          status: t.status,
-          client_name: t.clientName,
-          client_phone: t.clientPhone,
-          vehicle_plate: t.vehiclePlate,
-          vehicle_model: t.vehicleModel,
-          assigned_to: t.assignedTo,
-          assigned_to_name: t.assignedToName,
-          assigned_avatar: t.assignedAvatar,
-          due_date: t.dueDate,
-          checklist_items: t.checklistItems,
-          estimated_hours: t.estimatedHours,
-          actual_hours: t.actualHours,
-          cost: t.cost,
-          tags: t.tags,
-          notes: t.notes,
-          created_at: t.createdAt,
-          updated_at: t.updatedAt,
-          completed_at: t.completedAt,
-        }));
-        await supabase.from('tasks').upsert(formatted);
-      } catch (err) {
-        console.warn('Sync to Supabase background task upsert:', err);
+        const formatted = tasks.map(taskToDb);
+        const { error } = await supabase.from('tasks').upsert(formatted);
+        if (error) {
+          console.error('Erro ao sincronizar tarefas no Supabase:', error);
+          return { success: false, error: `[${error.code}] ${error.message}` };
+        }
+        return { success: true };
+      } catch (err: any) {
+        console.error('Falha de rede ao sincronizar tarefas:', err);
+        return { success: false, error: err.message };
       }
     }
+    return { success: true };
   },
 
   // Clients
@@ -348,18 +507,23 @@ export const StorageService = {
     return getLocal<Client[]>(KEYS.CLIENTS, INITIAL_CLIENTS);
   },
 
-  saveClients(clients: Client[]): void {
+  async saveClients(clients: Client[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.CLIENTS, clients);
     const supabase = getSupabase();
     if (supabase) {
-      (async () => {
-        try {
-          await supabase.from('clients').upsert(clients);
-        } catch (err) {
-          console.warn('Supabase clients sync:', err);
+      try {
+        const formatted = clients.map(clientToDb);
+        const { error } = await supabase.from('clients').upsert(formatted);
+        if (error) {
+          console.error('Erro ao sincronizar clientes no Supabase:', error);
+          return { success: false, error: error.message };
         }
-      })();
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     }
+    return { success: true };
   },
 
   // Vehicles
@@ -367,18 +531,23 @@ export const StorageService = {
     return getLocal<Vehicle[]>(KEYS.VEHICLES, INITIAL_VEHICLES);
   },
 
-  saveVehicles(vehicles: Vehicle[]): void {
+  async saveVehicles(vehicles: Vehicle[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.VEHICLES, vehicles);
     const supabase = getSupabase();
     if (supabase) {
-      (async () => {
-        try {
-          await supabase.from('vehicles').upsert(vehicles);
-        } catch (err) {
-          console.warn('Supabase vehicles sync:', err);
+      try {
+        const formatted = vehicles.map(vehicleToDb);
+        const { error } = await supabase.from('vehicles').upsert(formatted);
+        if (error) {
+          console.error('Erro ao sincronizar veículos no Supabase:', error);
+          return { success: false, error: error.message };
         }
-      })();
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     }
+    return { success: true };
   },
 
   // Checklists
@@ -395,18 +564,23 @@ export const StorageService = {
     return getLocal<Budget[]>(KEYS.BUDGETS, []);
   },
 
-  saveBudgets(budgets: Budget[]): void {
+  async saveBudgets(budgets: Budget[]): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.BUDGETS, budgets);
     const supabase = getSupabase();
     if (supabase) {
-      (async () => {
-        try {
-          await supabase.from('budgets').upsert(budgets);
-        } catch (err) {
-          console.warn('Supabase budgets sync:', err);
+      try {
+        const formatted = budgets.map(budgetToDb);
+        const { error } = await supabase.from('budgets').upsert(formatted);
+        if (error) {
+          console.error('Erro ao sincronizar orçamentos no Supabase:', error);
+          return { success: false, error: error.message };
         }
-      })();
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     }
+    return { success: true };
   },
 
   // Services Catalog
@@ -423,8 +597,23 @@ export const StorageService = {
     return getLocal<WorkshopConfig>(KEYS.CONFIG, INITIAL_CONFIG);
   },
 
-  saveConfig(config: WorkshopConfig): void {
+  async saveConfig(config: WorkshopConfig): Promise<{ success: boolean; error?: string }> {
     setLocal(KEYS.CONFIG, config);
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const formatted = configToDb(config);
+        const { error } = await supabase.from('workshop_config').upsert([formatted]);
+        if (error) {
+          console.error('Erro ao salvar configuração no Supabase:', error);
+          return { success: false, error: error.message };
+        }
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    }
+    return { success: true };
   },
 
   // Activity Logs
@@ -441,5 +630,85 @@ export const StorageService = {
     };
     const updated = [newEntry, ...list.slice(0, 49)];
     setLocal(KEYS.ACTIVITIES, updated);
+  },
+
+  // One-Click Migration Tool: Safely pushes all local data into Supabase
+  async syncAllLocalToSupabase(): Promise<{
+    success: boolean;
+    tasksSynced: number;
+    clientsSynced: number;
+    vehiclesSynced: number;
+    budgetsSynced: number;
+    error?: string;
+  }> {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return {
+        success: false,
+        tasksSynced: 0,
+        clientsSynced: 0,
+        vehiclesSynced: 0,
+        budgetsSynced: 0,
+        error: 'Cliente Supabase não inicializado. Verifique a URL e a Anon Key.',
+      };
+    }
+
+    try {
+      const localTasks = this.getTasks();
+      const localClients = this.getClients();
+      const localVehicles = this.getVehicles();
+      const localBudgets = this.getBudgets();
+      const localConfig = this.getConfig();
+
+      // 1. Sync Clients first (foreign key dependency)
+      if (localClients.length > 0) {
+        const clientsPayload = localClients.map(clientToDb);
+        const { error: clientErr } = await supabase.from('clients').upsert(clientsPayload);
+        if (clientErr) throw new Error(`Falha ao sincronizar clientes: ${clientErr.message}`);
+      }
+
+      // 2. Sync Vehicles
+      if (localVehicles.length > 0) {
+        const vehiclesPayload = localVehicles.map(vehicleToDb);
+        const { error: vehErr } = await supabase.from('vehicles').upsert(vehiclesPayload);
+        if (vehErr) throw new Error(`Falha ao sincronizar veículos: ${vehErr.message}`);
+      }
+
+      // 3. Sync Tasks / Work Orders
+      if (localTasks.length > 0) {
+        const tasksPayload = localTasks.map(taskToDb);
+        const { error: taskErr } = await supabase.from('tasks').upsert(tasksPayload);
+        if (taskErr) throw new Error(`Falha ao sincronizar tarefas: ${taskErr.message}`);
+      }
+
+      // 4. Sync Budgets
+      if (localBudgets.length > 0) {
+        const budgetsPayload = localBudgets.map(budgetToDb);
+        const { error: budgErr } = await supabase.from('budgets').upsert(budgetsPayload);
+        if (budgErr) throw new Error(`Falha ao sincronizar orçamentos: ${budgErr.message}`);
+      }
+
+      // 5. Sync Config
+      const configPayload = configToDb(localConfig);
+      await supabase.from('workshop_config').upsert([configPayload]);
+
+      return {
+        success: true,
+        tasksSynced: localTasks.length,
+        clientsSynced: localClients.length,
+        vehiclesSynced: localVehicles.length,
+        budgetsSynced: localBudgets.length,
+      };
+    } catch (err: any) {
+      console.error('Erro durante migração completa para Supabase:', err);
+      return {
+        success: false,
+        tasksSynced: 0,
+        clientsSynced: 0,
+        vehiclesSynced: 0,
+        budgetsSynced: 0,
+        error: err.message || 'Erro inesperado na sincronização.',
+      };
+    }
   },
 };
