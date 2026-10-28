@@ -43,9 +43,15 @@ export const Header: React.FC<Props> = ({
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-800 text-white flex items-center justify-center shadow-md shadow-blue-800/20">
-              <Wrench className="w-5 h-5 text-white" />
-            </div>
+            {config.logo ? (
+              <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-xs shrink-0">
+                <img src={config.logo} alt={config.nome} className="w-full h-full object-contain" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-800 text-white flex items-center justify-center shadow-md shadow-blue-800/20 shrink-0">
+                <Wrench className="w-5 h-5 text-white" />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-slate-900 text-base leading-tight">
@@ -213,13 +219,13 @@ export const Header: React.FC<Props> = ({
 
                   <div className="border-t border-slate-100 mt-1 pt-1">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setUserMenuOpen(false);
-                        logout();
+                        await logout();
                       }}
-                      className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                      className="w-full px-3 py-2 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2 transition-colors"
                     >
-                      <LogOut className="w-3.5 h-3.5" /> Sair da Conta
+                      <LogOut className="w-3.5 h-3.5" /> Desligar / Sair da Conta
                     </button>
                   </div>
                 </div>

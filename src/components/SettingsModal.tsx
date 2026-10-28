@@ -12,7 +12,7 @@ interface Props {
 
 export const SettingsModal: React.FC<Props> = ({ isOpen, onClose, onOpenSupabaseModal }) => {
   const { config, saveConfig, services, saveServices } = useTasks();
-  const { user, logout, quickLoginAs } = useAuth();
+  const { user, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'oficina' | 'servicos' | 'perfil'>('oficina');
 
@@ -21,11 +21,40 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose, onOpenSupabase
   const [cnpj, setCnpj] = useState(config.cnpj);
   const [tel, setTel] = useState(config.tel);
   const [end, setEnd] = useState(config.end);
+  const [logo, setLogo] = useState(config.logo || '');
   const [validade, setValidade] = useState(config.validade);
   const [pagto, setPagto] = useState(config.pagto);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Service form
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const src = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxW = 400;
+        if (width > maxW) {
+          height = Math.round((height * maxW) / width);
+          width = maxW;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/png', 0.85);
+        setLogo(compressed);
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Service form states
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState<number>(150);
 
@@ -38,6 +67,7 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose, onOpenSupabase
       cnpj,
       tel,
       end,
+      logo,
       validade,
       pagto,
     });
@@ -138,6 +168,54 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose, onOpenSupabase
                 >
                   Configurar Supabase
                 </button>
+              </div>
+
+              {/* Logo da Oficina */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Logo da Oficina
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                    {logo ? (
+                      <img src={logo} alt="Logo" className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <Building2 className="w-8 h-8 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="space-y-2 flex-1 w-full">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer shadow-xs transition-colors">
+                        <span>Carregar Imagem da Logo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {logo && (
+                        <button
+                          type="button"
+                          onClick={() => setLogo('')}
+                          className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-semibold transition-colors"
+                        >
+                          Remover Logo
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="url"
+                      value={logo.startsWith('data:') ? '' : logo}
+                      onChange={(e) => setLogo(e.target.value)}
+                      placeholder="Ou cole a URL da imagem da sua logo aqui (https://...)"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      Formatos recomendados: PNG, JPG ou WebP. A logo será exibida no topo do app e nos orçamentos em PDF.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -273,8 +351,8 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose, onOpenSupabase
 
           {activeTab === 'perfil' && (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-slate-50 border flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-800 font-bold text-lg flex items-center justify-center">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-blue-700 text-white font-bold text-lg flex items-center justify-center shadow-md shadow-blue-700/20">
                   {user?.name.charAt(0) || 'U'}
                 </div>
                 <div>
@@ -286,51 +364,22 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose, onOpenSupabase
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
-                  Trocar para outro perfil de teste (Demonstração rápida):
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <button
-                    onClick={() => quickLoginAs('Administrador')}
-                    className="p-2.5 rounded-xl border text-left hover:bg-slate-50"
-                  >
-                    <strong>João (Gerente Geral)</strong>
-                    <span className="block text-[11px] text-slate-400">Administrador</span>
-                  </button>
-                  <button
-                    onClick={() => quickLoginAs('Funileiro')}
-                    className="p-2.5 rounded-xl border text-left hover:bg-slate-50"
-                  >
-                    <strong>Marcos Funileiro</strong>
-                    <span className="block text-[11px] text-slate-400">Funileiro</span>
-                  </button>
-                  <button
-                    onClick={() => quickLoginAs('Pintor')}
-                    className="p-2.5 rounded-xl border text-left hover:bg-slate-50"
-                  >
-                    <strong>Roberto Pintor</strong>
-                    <span className="block text-[11px] text-slate-400">Pintor</span>
-                  </button>
-                  <button
-                    onClick={() => quickLoginAs('Mecânico')}
-                    className="p-2.5 rounded-xl border text-left hover:bg-slate-50"
-                  >
-                    <strong>Lucas Montador</strong>
-                    <span className="block text-[11px] text-slate-400">Mecânico</span>
-                  </button>
-                </div>
+              <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-slate-600 space-y-1">
+                <p className="font-semibold text-blue-950">Sessão Ativa e Segura</p>
+                <p>Usuário autenticado e sincronizado com o banco de dados Supabase.</p>
               </div>
 
-              <div className="pt-4 border-t flex justify-end">
+              <div className="pt-4 border-t flex justify-between items-center">
+                <span className="text-xs text-slate-400">Ao sair, será exigido login novamente.</span>
                 <button
-                  onClick={() => {
-                    logout();
+                  type="button"
+                  onClick={async () => {
+                    await logout();
                     onClose();
                   }}
-                  className="px-4 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-600/20"
                 >
-                  Encerrar Sessão
+                  Desligar / Sair da Conta
                 </button>
               </div>
             </div>

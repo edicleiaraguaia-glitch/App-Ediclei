@@ -29,7 +29,7 @@ export const RealtimeProgressDashboard: React.FC<Props> = ({
   onOpenChecklist,
   onNavigateToTasks,
 }) => {
-  const { stats, activities, lastUpdated, isRealtimeActive, tasks } = useTasks();
+  const { stats, activities, lastUpdated, isRealtimeActive, tasks, config } = useTasks();
 
   const activePendencies = stats.pendentes + stats.emAndamento + stats.aguardandoPecas + stats.emRevisao;
 
@@ -46,6 +46,11 @@ export const RealtimeProgressDashboard: React.FC<Props> = ({
       {/* Real-time Status Top Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white rounded-2xl shadow-lg border border-slate-700/50">
         <div className="flex items-center gap-3">
+          {config.logo && (
+            <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+              <img src={config.logo} alt={config.nome} className="w-full h-full object-contain" />
+            </div>
+          )}
           <div className="relative flex items-center justify-center">
             <span className="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
@@ -58,7 +63,7 @@ export const RealtimeProgressDashboard: React.FC<Props> = ({
               </span>
             </div>
             <p className="text-xs text-slate-300">
-              Última sincronização: {lastUpdated.toLocaleTimeString('pt-BR')} • {isRealtimeActive ? 'Canal ativo' : 'Local'}
+              {config.nome} • Última sincronização: {lastUpdated.toLocaleTimeString('pt-BR')} • {isRealtimeActive ? 'Canal ativo' : 'Local'}
             </p>
           </div>
         </div>

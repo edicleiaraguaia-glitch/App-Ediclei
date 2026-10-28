@@ -2,6 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../types';
 
 const STORAGE_KEY = 'oficina_supabase_config';
+const DEFAULT_URL = 'https://eqoebhpeaionrxqisuud.supabase.co';
+const DEFAULT_KEY = 'sb_publishable_U-7nbp4x2bYYLq9eBgfeOg_9Q0XzniI';
 
 let clientInstance: SupabaseClient | null = null;
 
@@ -22,9 +24,9 @@ export function getSavedConfig(): SupabaseConfig {
   }
 
   return {
-    url: envUrl || '',
-    anonKey: envKey || '',
-    isConnected: false,
+    url: envUrl || DEFAULT_URL,
+    anonKey: envKey || DEFAULT_KEY,
+    isConnected: true,
   };
 }
 
@@ -106,14 +108,14 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
       .limit(1);
 
     if (dbError) {
-      if (dbError.code === '42P01') {
+      if (dbError.code === '42P01' || dbError.code === 'PGRST205') {
         // Table doesn't exist yet, but connection to database succeeded!
         return {
           success: true,
-          message: 'Conectado ao Supabase com sucesso! (Tabela "tasks" ainda precisa ser criada com o script SQL).',
+          message: 'Conectado ao Supabase com sucesso! Endpoint e Chave ativos. Falta apenas executar o script SQL para criar as tabelas.',
         };
       }
-      return { success: false, message: `Erro no banco: ${dbError.message}` };
+      return { success: false, message: `Erro no banco: [${dbError.code}] ${dbError.message}` };
     }
 
     return { success: true, message: 'Conexão com Supabase validada e tabelas encontradas!' };
@@ -194,10 +196,22 @@ CREATE TABLE IF NOT EXISTS public.budgets (
   itens JSONB DEFAULT '[]'::jsonb
 );
 
--- 5. Habilitar Realtime nas tabelas
-ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.clients;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.budgets;
+-- 5. Habilitar Realtime nas tabelas com segurança
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.clients;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.budgets;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+END $$;
 
 -- 6. Habilitar Row Level Security (RLS) permissivo para leitura e escrita
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
@@ -205,9 +219,16 @@ ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Acesso total tasks" ON public.tasks;
 CREATE POLICY "Acesso total tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total clients" ON public.clients;
 CREATE POLICY "Acesso total clients" ON public.clients FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total vehicles" ON public.vehicles;
 CREATE POLICY "Acesso total vehicles" ON public.vehicles FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso total budgets" ON public.budgets;
 CREATE POLICY "Acesso total budgets" ON public.budgets FOR ALL USING (true) WITH CHECK (true);
 `;
 }

@@ -132,6 +132,45 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
     setDamageItems(updated);
   };
 
+  const [previewPhoto, setPreviewPhoto] = useState<{ src: string; title: string } | null>(null);
+
+  const handleServicePhotoUpload = (itemIdx: number, srvIdx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const src = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxW = 800;
+        if (width > maxW) {
+          height = Math.round((height * maxW) / width);
+          width = maxW;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.8);
+
+        const updated = [...damageItems];
+        updated[itemIdx].servicos[srvIdx].foto = compressed;
+        setDamageItems(updated);
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveServicePhoto = (itemIdx: number, srvIdx: number) => {
+    const updated = [...damageItems];
+    updated[itemIdx].servicos[srvIdx].foto = undefined;
+    setDamageItems(updated);
+  };
+
   // Subtotal & Total
   const subtotal = damageItems.reduce((acc, item) => {
     const itemTotal = item.servicos.reduce((sAcc, s) => sAcc + s.qtd * s.valor, 0);
@@ -180,6 +219,8 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
     }
 
     const lines: Budget['itens'] = [];
+    const budgetPhotos: NonNullable<Budget['fotos']> = [];
+
     damageItems.forEach((it) => {
       it.servicos.forEach((s) => {
         lines.push({
@@ -187,7 +228,15 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
           servico: s.nome,
           qtd: s.qtd,
           valor: s.valor,
+          foto: s.foto,
         });
+        if (s.foto) {
+          budgetPhotos.push({
+            peca: it.nome,
+            servico: s.nome,
+            foto: s.foto,
+          });
+        }
       });
     });
 
@@ -202,6 +251,7 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
       total,
       status: 'rascunho',
       itens: lines,
+      fotos: budgetPhotos,
     };
 
     saveBudget(newBudget);
@@ -709,12 +759,12 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
                             {item.servicos.map((srv, sIdx) => (
                               <div
                                 key={sIdx}
-                                className="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200"
+                                className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 bg-white rounded-xl border border-slate-200"
                               >
                                 <select
                                   value={srv.nome}
                                   onChange={(e) => handleServiceSelect(idx, sIdx, e.target.value)}
-                                  className="flex-1 px-2 py-1 rounded-lg border border-slate-200 text-xs bg-white text-slate-800"
+                                  className="flex-1 min-w-[140px] px-2 py-1 rounded-lg border border-slate-200 text-xs bg-white text-slate-800"
                                 >
                                   {services.map((s) => (
                                     <option key={s.id} value={s.nome}>
@@ -722,6 +772,49 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
                                     </option>
                                   ))}
                                 </select>
+
+                                {/* Campo de Foto do Serviço */}
+                                <div className="flex items-center shrink-0">
+                                  {srv.foto ? (
+                                    <div className="relative group/photo flex items-center gap-1.5 p-1 bg-blue-50 border border-blue-200 rounded-lg">
+                                      <img
+                                        src={srv.foto}
+                                        alt="Foto do dano"
+                                        onClick={() =>
+                                          setPreviewPhoto({
+                                            src: srv.foto!,
+                                            title: `${item.nome} - ${srv.nome}`,
+                                          })
+                                        }
+                                        className="w-7 h-7 rounded object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                      />
+                                      <span className="text-[10px] text-blue-700 font-bold hidden sm:inline">Foto</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveServicePhoto(idx, sIdx)}
+                                        className="w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center hover:bg-rose-600"
+                                        title="Remover foto"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label
+                                      className="px-2 py-1 rounded-lg border border-dashed border-slate-300 text-slate-600 hover:text-blue-600 hover:border-blue-400 bg-slate-50 hover:bg-blue-50 cursor-pointer flex items-center gap-1 text-[11px] font-medium transition-colors"
+                                      title="Tirar ou anexar foto deste serviço/avaria"
+                                    >
+                                      <Camera className="w-3.5 h-3.5 text-blue-600" />
+                                      <span className="text-[10px]">Foto</span>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onChange={(e) => handleServicePhotoUpload(idx, sIdx, e)}
+                                        className="hidden"
+                                      />
+                                    </label>
+                                  )}
+                                </div>
 
                                 <div className="flex items-center gap-1 w-20">
                                   <span className="text-[10px] text-slate-400">Qtd:</span>
@@ -830,6 +923,46 @@ export const CarVisualChecklist: React.FC<Props> = ({ onBudgetCreated, onNavigat
           </div>
         </div>
       </div>
+
+      {/* Modal de Pré-visualização da Foto */}
+      {previewPhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="text-sm font-bold text-slate-800">{previewPhoto.title}</h4>
+              <button
+                type="button"
+                onClick={() => setPreviewPhoto(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center max-h-[70vh]">
+              <img
+                src={previewPhoto.src}
+                alt={previewPhoto.title}
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setPreviewPhoto(null)}
+                className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

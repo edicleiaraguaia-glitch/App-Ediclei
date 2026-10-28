@@ -78,6 +78,7 @@ export interface DamageItem {
     nome: string;
     qtd: number;
     valor: number;
+    foto?: string;
   }[];
 }
 
@@ -112,6 +113,12 @@ export interface Budget {
     servico: string;
     qtd: number;
     valor: number;
+    foto?: string;
+  }[];
+  fotos?: {
+    peca: string;
+    servico?: string;
+    foto: string;
   }[];
 }
 
@@ -138,6 +145,15 @@ export interface UserProfile {
   name: string;
   role: 'Administrador' | 'Funileiro' | 'Pintor' | 'Mecânico' | 'Atendente';
   avatar?: string;
+}
+
+export interface RegisteredUserAccount {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  role: 'Administrador' | 'Funileiro' | 'Pintor' | 'Mecânico' | 'Atendente';
+  createdAt: string;
 }
 
 export interface SupabaseConfig {
