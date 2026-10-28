@@ -59,6 +59,9 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
     setTestResult(null);
     const res = await testSupabaseConnection(url.trim(), anonKey.trim());
     setTesting(false);
+    if (res.normalizedUrl && res.normalizedUrl !== url) {
+      setUrl(res.normalizedUrl);
+    }
     setTestResult(res);
   };
 
@@ -67,6 +70,9 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
     if (!res.success) {
       setTestResult({ success: false, message: res.error || 'Erro ao salvar configuração' });
       return;
+    }
+    if (res.normalizedUrl && res.normalizedUrl !== url) {
+      setUrl(res.normalizedUrl);
     }
     refreshData();
     onClose();

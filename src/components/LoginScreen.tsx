@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Wrench, Lock, Mail, User, Database, ArrowRight, AlertCircle, CheckCircle2, RefreshCw, KeyRound, ArrowUpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile } from '../types';
-import { getSavedConfig } from '../lib/supabase';
+import { getSavedConfig, isSupabaseConfigured } from '../lib/supabase';
 
 interface LoginScreenProps {
   onOpenSupabaseModal?: () => void;
@@ -132,10 +132,50 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenSupabaseModal })
 
         {/* Form Body */}
         <div className="p-8 space-y-4">
+          {!isSupabaseConfigured() && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-2 animate-in fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Novo Projeto Supabase Pendente</p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Para cadastrar e sincronizar suas ordens de serviço na nuvem, insira a URL e a Chave Anon do seu novo projeto.
+                  </p>
+                </div>
+              </div>
+              {onOpenSupabaseModal && (
+                <button
+                  type="button"
+                  onClick={onOpenSupabaseModal}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  Conectar Novo Projeto Supabase Agora
+                </button>
+              )}
+            </div>
+          )}
+
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium space-y-2.5 animate-in fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{error}</span>
+              </div>
+              {(error.toLowerCase().includes('fetch') ||
+                error.toLowerCase().includes('supabase') ||
+                error.toLowerCase().includes('conect') ||
+                error.toLowerCase().includes('configur')) &&
+                onOpenSupabaseModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenSupabaseModal}
+                    className="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                  >
+                    <Database className="w-3.5 h-3.5" />
+                    Abrir Configurações do Supabase para Corrigir URL e Chave
+                  </button>
+                )}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, RegisteredUserAccount } from '../types';
-import { getSupabase } from '../lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -141,6 +141,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Por favor, informe o e-mail e a senha.' };
     }
 
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        error: 'O novo projeto Supabase ainda não foi conectado. Clique em "Configurar Supabase" para inserir a URL e Chave Anon do seu novo projeto.',
+      };
+    }
+
     const supabase = getSupabase();
 
     // 1. Authenticate with Supabase Auth
@@ -202,7 +209,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 return {
                   success: false,
-                  error: 'Sua conta antiga foi cadastrada agora no Supabase Authentication! Se o Supabase exigir confirmação de e-mail, autorize pelo link enviado ou desative "Confirm email" no painel Supabase.',
+                  error: 'Sua conta anterior foi cadastrada agora no Supabase Authentication! Se o Supabase exigir confirmação de e-mail, autorize pelo link enviado ou desative "Confirm email" no painel Supabase.',
                 };
               }
             }
@@ -231,6 +238,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (authErr: any) {
         console.error('Falha de conexão com Supabase Auth:', authErr);
+        const msg = (authErr.message || '').toLowerCase();
+        if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch')) {
+          return {
+            success: false,
+            error: 'Falha ao conectar no Supabase (Failed to fetch). O servidor do projeto não respondeu. Verifique se o seu novo projeto está ativo (não pausado) no painel do Supabase e se a URL e a Chave Anon foram salvas corretamente.',
+          };
+        }
         return { success: false, error: `Falha ao conectar no Supabase: ${authErr.message || 'Verifique sua conexão'}` };
       }
     }
@@ -291,6 +305,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'A senha deve conter no mínimo 6 caracteres.' };
     }
 
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        error: 'O novo projeto Supabase ainda não foi conectado. Clique em "Configurar Supabase" para inserir a URL e a Chave Anon do seu novo projeto antes de cadastrar novos usuários.',
+      };
+    }
+
     const supabase = getSupabase();
 
     // 1. Register with Supabase Auth
@@ -306,7 +327,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           let errorMsg = error.message;
-          if (error.message.includes('User already registered') || error.message.includes('already exists')) {
+          const lower = error.message.toLowerCase();
+          if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('fetch')) {
+            errorMsg = 'Falha ao conectar no servidor do Supabase (Failed to fetch). O endereço do projeto não respondeu. Verifique se o seu novo projeto está ativo (não pausado) no painel do Supabase e se a URL e a Chave Anon estão corretas.';
+          } else if (lower.includes('user already registered') || lower.includes('already exists')) {
             errorMsg = 'Este e-mail já está cadastrado no Supabase. Faça login com sua senha.';
           }
           return { success: false, error: `Erro no Supabase: ${errorMsg}` };
@@ -363,6 +387,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { success: true };
         }
       } catch (err: any) {
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch')) {
+          return {
+            success: false,
+            error: 'Falha de conexão com o Supabase (Failed to fetch). O endereço do projeto não respondeu. Causas mais prováveis: 1) O projeto está Pausado ("Paused") no painel do Supabase; 2) A URL foi digitada com erro; 3) O projeto acabou de ser criado e ainda está inicializando na nuvem.',
+          };
+        }
         return { success: false, error: `Falha ao registrar no Supabase: ${err.message || 'Erro de conexão'}` };
       }
     }

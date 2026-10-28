@@ -2,10 +2,48 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../types';
 
 const STORAGE_KEY = 'oficina_supabase_config';
-const DEFAULT_URL = 'https://eqoebhpeaionrxqisuud.supabase.co';
-const DEFAULT_KEY = 'sb_publishable_U-7nbp4x2bYYLq9eBgfeOg_9Q0XzniI';
+export const LEGACY_DEAD_HOST = 'eqoebhpeaionrxqisuud.supabase.co';
 
 let clientInstance: SupabaseClient | null = null;
+
+export function normalizeSupabaseUrl(rawUrl: string): { url: string; autoCorrected: boolean; warning?: string } {
+  let clean = (rawUrl || '').trim();
+  if (!clean) return { url: '', autoCorrected: false };
+
+  // Remove surrounding quotes and whitespaces
+  clean = clean.replace(/^["']+|["']+$/g, '').trim();
+
+  let autoCorrected = false;
+  let warning: string | undefined;
+
+  // Check if user pasted a dashboard URL (e.g. https://supabase.com/dashboard/project/xxxxxx or https://app.supabase.com/project/xxxxxx)
+  const dashboardMatch = clean.match(/supabase\.com\/dashboard\/project\/([a-zA-Z0-9_-]+)/) ||
+                         clean.match(/app\.supabase\.com\/project\/([a-zA-Z0-9_-]+)/);
+  if (dashboardMatch && dashboardMatch[1]) {
+    const projectRef = dashboardMatch[1];
+    clean = `https://${projectRef}.supabase.co`;
+    autoCorrected = true;
+    warning = `Link do painel detectado! Convertido automaticamente para a URL de API: ${clean}`;
+  }
+
+  // Prepend https:// if missing
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    clean = `https://${clean}`;
+    autoCorrected = true;
+  }
+
+  // Remove trailing slashes
+  clean = clean.replace(/\/+$/, '');
+
+  return { url: clean, autoCorrected, warning };
+}
+
+export function isSupabaseConfigured(): boolean {
+  const config = getSavedConfig();
+  if (!config.url || !config.anonKey) return false;
+  if (config.url.includes(LEGACY_DEAD_HOST)) return false;
+  return true;
+}
 
 export function getSavedConfig(): SupabaseConfig {
   const envUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -30,7 +68,7 @@ export function getSavedConfig(): SupabaseConfig {
       }
 
       if (incomingUrl && incomingKey) {
-        const cleanUrl = decodeURIComponent(incomingUrl.trim());
+        const { url: cleanUrl } = normalizeSupabaseUrl(decodeURIComponent(incomingUrl));
         const cleanKey = decodeURIComponent(incomingKey.trim());
         const configToSave: SupabaseConfig = {
           url: cleanUrl,
@@ -56,18 +94,39 @@ export function getSavedConfig(): SupabaseConfig {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.url && parsed.anonKey) {
-        return parsed;
+        // If it's pointing to the old deleted project, do not treat as configured
+        if (parsed.url.includes(LEGACY_DEAD_HOST)) {
+          return {
+            url: '',
+            anonKey: '',
+            isConnected: false,
+          };
+        }
+        const { url: normalized } = normalizeSupabaseUrl(parsed.url);
+        return {
+          ...parsed,
+          url: normalized,
+        };
       }
     }
   } catch (err) {
     console.warn('Erro ao carregar configuração salva do Supabase', err);
   }
 
-  // 3. Fallback to Vite env variables or defaults
+  // 3. Fallback to Vite env variables or empty
+  if (envUrl && envKey && !envUrl.includes(LEGACY_DEAD_HOST)) {
+    const { url: normalizedEnvUrl } = normalizeSupabaseUrl(envUrl);
+    return {
+      url: normalizedEnvUrl,
+      anonKey: envKey,
+      isConnected: true,
+    };
+  }
+
   return {
-    url: envUrl || DEFAULT_URL,
-    anonKey: envKey || DEFAULT_KEY,
-    isConnected: true,
+    url: '',
+    anonKey: '',
+    isConnected: false,
   };
 }
 
@@ -119,49 +178,66 @@ export function getSupabase(): SupabaseClient | null {
   return clientInstance;
 }
 
-export function saveSupabaseConfig(url: string, anonKey: string): { success: boolean; error?: string } {
+export function saveSupabaseConfig(rawUrl: string, rawAnonKey: string): { success: boolean; error?: string; normalizedUrl?: string } {
   try {
-    if (!url.trim() || !anonKey.trim()) {
+    const cleanKey = (rawAnonKey || '').trim().replace(/^["']+|["']+$/g, '');
+    const { url: normalizedUrl } = normalizeSupabaseUrl(rawUrl);
+
+    if (!normalizedUrl || !cleanKey) {
       localStorage.removeItem(STORAGE_KEY);
       clientInstance = null;
       return { success: true };
     }
 
-    new URL(url);
+    try {
+      new URL(normalizedUrl);
+    } catch {
+      return { success: false, error: 'URL do Supabase inválida. O formato deve ser https://seu-projeto.supabase.co' };
+    }
+
     const newConfig: SupabaseConfig = {
-      url: url.trim(),
-      anonKey: anonKey.trim(),
-      isConnected: false,
+      url: normalizedUrl,
+      anonKey: cleanKey,
+      isConnected: true,
       lastChecked: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
     initSupabaseClient(newConfig);
-    return { success: true };
+    return { success: true, normalizedUrl };
   } catch (err: any) {
     return { success: false, error: err.message || 'URL inválida' };
   }
 }
 
-export async function testSupabaseConnection(url: string, anonKey: string): Promise<{
+export async function testSupabaseConnection(rawUrl: string, rawAnonKey: string): Promise<{
   success: boolean;
   message: string;
   clientInitialized?: boolean;
   authEndpointOk?: boolean;
   tablesStatus?: Record<string, boolean>;
   allTablesReady?: boolean;
+  normalizedUrl?: string;
+  warning?: string;
 }> {
   try {
-    const cleanUrl = url.trim();
-    const cleanKey = anonKey.trim();
+    const cleanKey = (rawAnonKey || '').trim().replace(/^["']+|["']+$/g, '');
+    const { url: cleanUrl, autoCorrected, warning } = normalizeSupabaseUrl(rawUrl);
 
     if (!cleanUrl || !cleanKey) {
       return { success: false, message: 'Preencha a URL e a Anon Key antes de testar.' };
     }
 
+    if (cleanUrl.includes(LEGACY_DEAD_HOST)) {
+      return {
+        success: false,
+        message: 'Esta é a URL do projeto anterior. Por favor, insira a URL do seu novo projeto Supabase.',
+      };
+    }
+
     try {
       new URL(cleanUrl);
     } catch {
-      return { success: false, message: 'A URL informada não é válida. O formato deve ser https://seu-projeto.supabase.co' };
+      return { success: false, message: 'A URL informada não é válida. O formato correto é https://seu-projeto.supabase.co' };
     }
 
     if (!cleanUrl.startsWith('https://')) {
@@ -195,6 +271,14 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
       }
       authEndpointOk = true;
     } catch (authErr: any) {
+      const msg = (authErr.message || '').toLowerCase();
+      if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch')) {
+        return {
+          success: false,
+          clientInitialized: true,
+          message: `Não foi possível conectar ao servidor (${cleanUrl}): Failed to fetch. Motivos prováveis: 1) O projeto está PAUSADO ('Paused') no painel do Supabase; 2) O endereço contém algum caractere incorreto; 3) O projeto acabou de ser criado e ainda está inicializando na nuvem.`,
+        };
+      }
       return {
         success: false,
         clientInitialized: true,
@@ -208,34 +292,52 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
     let missingTables: string[] = [];
 
     for (const table of tables) {
-      const { error } = await testClient.from(table).select('id').limit(1);
-      if (error) {
-        if (
-          error.code === 'PGRST301' ||
-          error.message?.toLowerCase().includes('jwt') ||
-          error.message?.toLowerCase().includes('apikey') ||
-          error.message?.toLowerCase().includes('invalid api key')
-        ) {
+      try {
+        const { error } = await testClient.from(table).select('id').limit(1);
+        if (error) {
+          if (
+            error.code === 'PGRST301' ||
+            error.message?.toLowerCase().includes('jwt') ||
+            error.message?.toLowerCase().includes('apikey') ||
+            error.message?.toLowerCase().includes('invalid api key')
+          ) {
+            return {
+              success: false,
+              clientInitialized: true,
+              authEndpointOk: true,
+              message: `Chave Anon inválida ou incorreta: ${error.message}. Certifique-se de copiar a chave "anon public" das configurações do seu novo projeto Supabase.`,
+            };
+          }
+          if (error.code === '42P01' || error.code === 'PGRST205') {
+            tablesStatus[table] = false;
+            missingTables.push(table);
+          } else {
+            tablesStatus[table] = true;
+          }
+        } else {
+          tablesStatus[table] = true;
+        }
+      } catch (tblErr: any) {
+        const msg = (tblErr.message || '').toLowerCase();
+        if (msg.includes('failed to fetch')) {
           return {
             success: false,
             clientInitialized: true,
             authEndpointOk: true,
-            message: `Chave Anon inválida ou incorreta: ${error.message}. Certifique-se de copiar a chave "anon public" das configurações do seu projeto Supabase.`,
+            message: `Falha de rede ao consultar as tabelas (${cleanUrl}): Failed to fetch. Verifique se o projeto está ativo.`,
           };
         }
-        if (error.code === '42P01' || error.code === 'PGRST205') {
-          tablesStatus[table] = false;
-          missingTables.push(table);
-        } else {
-          // Table exists
-          tablesStatus[table] = true;
-        }
-      } else {
-        tablesStatus[table] = true;
+        tablesStatus[table] = false;
+        missingTables.push(table);
       }
     }
 
     const allTablesReady = missingTables.length === 0;
+
+    let successMsg = 'Cliente Supabase inicializado e 100% validado! Todas as 6 tabelas e permissões estão prontas para sincronizar entre todos os seus dispositivos.';
+    if (autoCorrected && warning) {
+      successMsg = `${warning}. ` + successMsg;
+    }
 
     if (!allTablesReady) {
       return {
@@ -243,6 +345,8 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
         clientInitialized: true,
         authEndpointOk: true,
         allTablesReady: false,
+        normalizedUrl: cleanUrl,
+        warning,
         message: `Cliente Supabase inicializado e autenticado com sucesso! Porém, as tabelas (${missingTables.join(', ')}) ainda não existem neste novo projeto. Copie o script SQL na aba "Script SQL" e execute no SQL Editor do Supabase.`,
         tablesStatus,
       };
@@ -253,7 +357,9 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
       clientInitialized: true,
       authEndpointOk: true,
       allTablesReady: true,
-      message: 'Cliente Supabase inicializado e 100% validado! Todas as 6 tabelas e permissões estão prontas para sincronizar entre todos os seus dispositivos.',
+      normalizedUrl: cleanUrl,
+      warning,
+      message: successMsg,
       tablesStatus,
     };
   } catch (err: any) {
