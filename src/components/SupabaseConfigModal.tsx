@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, CheckCircle2, AlertCircle, Copy, ExternalLink, RefreshCw, X, ShieldCheck, Zap, ArrowUpCircle, Check, Smartphone, Share2, Code } from 'lucide-react';
+import { Database, CheckCircle2, AlertCircle, Copy, ExternalLink, RefreshCw, X, ShieldCheck, Zap, ArrowUpCircle, Check, Smartphone, Share2, Code, Download } from 'lucide-react';
 import { getSavedConfig, saveSupabaseConfig, testSupabaseConnection, getSupabaseSchemaSql, generateQuickConnectUrl, getVercelEnvSnippet } from '../lib/supabase';
 import { StorageService } from '../lib/storage';
 import { useTasks } from '../context/TaskContext';
@@ -29,6 +29,8 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   // Migration states
   const [syncing, setSyncing] = useState(false);
+  const [migrationConfirmed, setMigrationConfirmed] = useState(false);
+  const [backupDownloaded, setBackupDownloaded] = useState(false);
   const [syncResult, setSyncResult] = useState<{
     success: boolean;
     tasksSynced: number;
@@ -377,12 +379,49 @@ export const SupabaseConfigModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
+              {/* Backup First Action */}
+              <div className="p-3.5 rounded-xl border border-blue-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs">
+                  <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-blue-600" />
+                    Etapa 1: Fazer Backup de Segurança dos Dados Locais
+                  </p>
+                  <p className="text-slate-500 text-[11px] mt-0.5">
+                    Baixa um arquivo JSON seguro com todas as suas tarefas, clientes e ordens deste dispositivo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    StorageService.exportBackup();
+                    setBackupDownloaded(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {backupDownloaded ? 'Baixar Novamente (JSON)' : 'Fazer Download do Backup (JSON)'}
+                </button>
+              </div>
+
+              {/* Confirmation Checkbox */}
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={migrationConfirmed}
+                  onChange={(e) => setMigrationConfirmed(e.target.checked)}
+                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="leading-relaxed">
+                  <strong>Etapa 2:</strong> Confirmo que os dados acima estão corretos e autorizo o envio seguro para as tabelas do projeto Supabase sem risco de perda ou duplicação.
+                </span>
+              </label>
+
               {/* Migration Action Button */}
               <button
                 type="button"
                 onClick={handleRunMigration}
-                disabled={syncing}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                disabled={syncing || !migrationConfirmed}
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ArrowUpCircle className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing

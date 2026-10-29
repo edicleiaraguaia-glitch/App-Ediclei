@@ -20,7 +20,7 @@ function MainAppContent() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'checklist' | 'budgets' | 'clients'>('dashboard');
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [supabaseModalOpen, setSupabaseModalOpen] = useState(true);
+  const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [tasksFilter, setTasksFilter] = useState<TaskStatus | 'urgentes' | 'todas'>('todas');
 

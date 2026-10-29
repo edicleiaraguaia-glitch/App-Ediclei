@@ -672,6 +672,33 @@ export const StorageService = {
     setLocal(KEYS.ACTIVITIES, updated);
   },
 
+  // Export all local data to a safe JSON file for backup
+  exportBackup(): void {
+    try {
+      const backupData = {
+        app: 'Oficina & Tarefas — Oficina Evaldo Pinturas',
+        exportedAt: new Date().toISOString(),
+        tasks: this.getTasks(),
+        clients: this.getClients(),
+        vehicles: this.getVehicles(),
+        budgets: this.getBudgets(),
+        services: this.getServices(),
+        config: this.getConfig(),
+        activities: this.getActivities(),
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `backup_oficina_evaldo_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      console.error('Erro ao gerar backup:', err);
+    }
+  },
+
   // One-Click Migration Tool: Safely pushes all local data into Supabase
   async syncAllLocalToSupabase(): Promise<{
     success: boolean;
@@ -694,6 +721,19 @@ export const StorageService = {
     }
 
     try {
+      // Pre-check: verify if tables exist in the current Supabase project
+      const { error: testErr } = await supabase.from('tasks').select('id').limit(1);
+      if (testErr && (testErr.code === '42P01' || testErr.code === 'PGRST205')) {
+        return {
+          success: false,
+          tasksSynced: 0,
+          clientsSynced: 0,
+          vehiclesSynced: 0,
+          budgetsSynced: 0,
+          error: 'As tabelas ainda não foram criadas no seu projeto Supabase (erro 42P01). Acesse a aba "Script SQL (Tabelas)", copie o script e execute no SQL Editor do Supabase antes de migrar os dados.',
+        };
+      }
+
       const localTasks = this.getTasks();
       const localClients = this.getClients();
       const localVehicles = this.getVehicles();
@@ -703,34 +743,34 @@ export const StorageService = {
       // 1. Sync Clients first (foreign key dependency)
       if (localClients.length > 0) {
         const clientsPayload = localClients.map(clientToDb);
-        const { error: clientErr } = await supabase.from('clients').upsert(clientsPayload);
+        const { error: clientErr } = await supabase.from('clients').upsert(clientsPayload, { onConflict: 'id' });
         if (clientErr) throw new Error(`Falha ao sincronizar clientes: ${clientErr.message}`);
       }
 
       // 2. Sync Vehicles
       if (localVehicles.length > 0) {
         const vehiclesPayload = localVehicles.map(vehicleToDb);
-        const { error: vehErr } = await supabase.from('vehicles').upsert(vehiclesPayload);
+        const { error: vehErr } = await supabase.from('vehicles').upsert(vehiclesPayload, { onConflict: 'id' });
         if (vehErr) throw new Error(`Falha ao sincronizar veículos: ${vehErr.message}`);
       }
 
       // 3. Sync Tasks / Work Orders
       if (localTasks.length > 0) {
         const tasksPayload = localTasks.map(taskToDb);
-        const { error: taskErr } = await supabase.from('tasks').upsert(tasksPayload);
+        const { error: taskErr } = await supabase.from('tasks').upsert(tasksPayload, { onConflict: 'id' });
         if (taskErr) throw new Error(`Falha ao sincronizar tarefas: ${taskErr.message}`);
       }
 
       // 4. Sync Budgets
       if (localBudgets.length > 0) {
         const budgetsPayload = localBudgets.map(budgetToDb);
-        const { error: budgErr } = await supabase.from('budgets').upsert(budgetsPayload);
+        const { error: budgErr } = await supabase.from('budgets').upsert(budgetsPayload, { onConflict: 'id' });
         if (budgErr) throw new Error(`Falha ao sincronizar orçamentos: ${budgErr.message}`);
       }
 
       // 5. Sync Config
       const configPayload = configToDb(localConfig);
-      await supabase.from('workshop_config').upsert([configPayload]);
+      await supabase.from('workshop_config').upsert([configPayload], { onConflict: 'id' });
 
       return {
         success: true,

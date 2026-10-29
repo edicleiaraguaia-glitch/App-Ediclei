@@ -112,16 +112,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const mappedClients = remoteClients.map(dbToClient);
           const remoteClientIds = new Set(mappedClients.map((c) => c.id));
           const unuploadedClients = currentClients.filter((c) => !remoteClientIds.has(c.id));
-
-          // Auto-sync unuploaded clients to Supabase
-          if (unuploadedClients.length > 0) {
-            try {
-              await supabase.from('clients').upsert(unuploadedClients.map(clientToDb));
-            } catch (e) {
-              console.warn('Erro ao auto-sincronizar clientes antigos:', e);
-            }
-          }
-
           const mergedClients = [...mappedClients, ...unuploadedClients];
           setClients(mergedClients);
           StorageService.saveClientsLocally(mergedClients);
@@ -136,15 +126,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const remoteVehIds = new Set(mappedVehicles.map((v) => v.id));
           const unuploadedVehicles = currentVehicles.filter((v) => !remoteVehIds.has(v.id));
 
-          // Auto-sync unuploaded vehicles to Supabase
-          if (unuploadedVehicles.length > 0) {
-            try {
-              await supabase.from('vehicles').upsert(unuploadedVehicles.map(vehicleToDb));
-            } catch (e) {
-              console.warn('Erro ao auto-sincronizar veículos antigos:', e);
-            }
-          }
-
           const mergedVehicles = [...mappedVehicles, ...unuploadedVehicles];
           setVehicles(mergedVehicles);
           StorageService.saveVehiclesLocally(mergedVehicles);
@@ -158,15 +139,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const currentLocalTasks = StorageService.getTasks();
           const remoteTaskIds = new Set(mappedTasks.map((t) => t.id));
           const unuploadedTasks = currentLocalTasks.filter((t) => !remoteTaskIds.has(t.id));
-
-          // Auto-sync unuploaded tasks (old service orders!) to Supabase
-          if (unuploadedTasks.length > 0) {
-            try {
-              await supabase.from('tasks').upsert(unuploadedTasks.map(taskToDb));
-            } catch (e) {
-              console.warn('Erro ao auto-sincronizar ordens de serviço antigas:', e);
-            }
-          }
 
           const mergedTasks = [...mappedTasks, ...unuploadedTasks];
           setTasks(mergedTasks);
@@ -663,11 +635,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const currentLocal = StorageService.getTasks();
           const remoteIds = new Set(mapped.map((t) => t.id));
           const unuploaded = currentLocal.filter((t) => !remoteIds.has(t.id));
-
-          if (unuploaded.length > 0) {
-            await supabase.from('tasks').upsert(unuploaded.map(taskToDb));
-          }
-
           const merged = [...mapped, ...unuploaded];
           setTasks(merged);
           StorageService.saveTasksLocally(merged);

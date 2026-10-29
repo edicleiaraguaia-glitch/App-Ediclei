@@ -501,30 +501,108 @@ BEGIN
   END;
 END $$;
 
--- 8. Habilitar Row Level Security (RLS) permissivo para leitura e escrita
-ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+-- 8. Trigger para sincronizar novos usuários do Supabase Auth para a tabela public.profiles
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, name, role, created_at)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'Administrador'),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = COALESCE(EXCLUDED.name, public.profiles.name),
+    role = COALESCE(EXCLUDED.role, public.profiles.role);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Sincronizar usuários existentes em auth.users para public.profiles
+INSERT INTO public.profiles (id, email, name, role, created_at)
+SELECT
+  id,
+  email,
+  COALESCE(raw_user_meta_data->>'name', split_part(email, '@', 1)),
+  COALESCE(raw_user_meta_data->>'role', 'Administrador'),
+  created_at
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+
+-- 9. Segurança e Row Level Security (RLS) - Exclusivo para Usuários Autenticados
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workshop_config ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Acesso total tasks" ON public.tasks;
-CREATE POLICY "Acesso total tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Acesso total clients" ON public.clients;
-CREATE POLICY "Acesso total clients" ON public.clients FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Acesso total vehicles" ON public.vehicles;
-CREATE POLICY "Acesso total vehicles" ON public.vehicles FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Acesso total budgets" ON public.budgets;
-CREATE POLICY "Acesso total budgets" ON public.budgets FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Acesso total workshop_config" ON public.workshop_config;
-CREATE POLICY "Acesso total workshop_config" ON public.workshop_config FOR ALL USING (true) WITH CHECK (true);
-
+-- Políticas de Profiles: apenas usuários autenticados
+DROP POLICY IF EXISTS "Perfis visíveis por usuários autenticados" ON public.profiles;
 DROP POLICY IF EXISTS "Acesso total profiles" ON public.profiles;
-CREATE POLICY "Acesso total profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Perfis visíveis por usuários autenticados" 
+ON public.profiles FOR SELECT 
+TO authenticated 
+USING (true);
+
+DROP POLICY IF EXISTS "Usuário edita próprio perfil" ON public.profiles;
+CREATE POLICY "Usuário edita próprio perfil" 
+ON public.profiles FOR ALL 
+TO authenticated 
+USING (auth.uid() = id) 
+WITH CHECK (auth.uid() = id);
+
+-- Políticas de Clientes: restrito a autenticados
+DROP POLICY IF EXISTS "Clientes restritos a autenticados" ON public.clients;
+DROP POLICY IF EXISTS "Acesso total clients" ON public.clients;
+CREATE POLICY "Clientes restritos a autenticados" 
+ON public.clients FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- Políticas de Veículos: restrito a autenticados
+DROP POLICY IF EXISTS "Veiculos restritos a autenticados" ON public.vehicles;
+DROP POLICY IF EXISTS "Acesso total vehicles" ON public.vehicles;
+CREATE POLICY "Veiculos restritos a autenticados" 
+ON public.vehicles FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- Políticas de Tasks (Ordens de Serviço): restrito a autenticados
+DROP POLICY IF EXISTS "Tarefas restritas a autenticados" ON public.tasks;
+DROP POLICY IF EXISTS "Acesso total tasks" ON public.tasks;
+CREATE POLICY "Tarefas restritas a autenticados" 
+ON public.tasks FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- Políticas de Orçamentos: restrito a autenticados
+DROP POLICY IF EXISTS "Orcamentos restritos a autenticados" ON public.budgets;
+DROP POLICY IF EXISTS "Acesso total budgets" ON public.budgets;
+CREATE POLICY "Orcamentos restritos a autenticados" 
+ON public.budgets FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- Políticas de Configuração: restrito a autenticados
+DROP POLICY IF EXISTS "Configuração restrita a autenticados" ON public.workshop_config;
+DROP POLICY IF EXISTS "Acesso total workshop_config" ON public.workshop_config;
+CREATE POLICY "Configuração restrita a autenticados" 
+ON public.workshop_config FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
 `;
 }

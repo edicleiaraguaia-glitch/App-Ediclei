@@ -49,16 +49,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const supabase = getSupabase();
 
       // 1. Check if Supabase has an active session
-      if (supabase) {
+      if (supabase && isSupabaseConfigured()) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user && isMounted) {
+            let name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Usuário';
+            let role = session.user.user_metadata?.role || 'Administrador';
+            let avatar = session.user.user_metadata?.avatar;
+
+            try {
+              const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+              if (prof) {
+                name = prof.name || name;
+                role = prof.role || role;
+                avatar = prof.avatar || avatar;
+              }
+            } catch {}
+
             const profile: UserProfile = {
               id: session.user.id,
               email: session.user.email || '',
-              name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Usuário',
-              role: session.user.user_metadata?.role || 'Administrador',
-              avatar: session.user.user_metadata?.avatar,
+              name,
+              role,
+              avatar,
             };
             setUser(profile);
             setIsSupabaseAuth(true);
@@ -68,9 +81,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (err) {
           console.warn('Erro ao verificar sessão Supabase:', err);
         }
+
+        // If Supabase is configured and has no active session, do not auto-login to stale local session!
+        localStorage.removeItem(USER_SESSION_KEY);
+        if (isMounted) {
+          setUser(null);
+          setIsSupabaseAuth(false);
+          setLoading(false);
+        }
+        return;
       }
 
-      // 2. Check local authenticated session
+      // 2. Offline fallback ONLY if Supabase is completely unconfigured
       const saved = localStorage.getItem(USER_SESSION_KEY);
       if (saved && isMounted) {
         try {
@@ -85,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 3. If no active session, STRICTLY do NOT log in. Stay at login screen!
+      // 3. If no active session, stay at login screen
       if (isMounted) {
         setUser(null);
         setIsSupabaseAuth(false);
@@ -98,27 +120,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen to Supabase Auth state changes if available
     const supabase = getSupabase();
     let authListener: { subscription: { unsubscribe: () => void } } | null = null;
-    if (supabase) {
+    if (supabase && isSupabaseConfigured()) {
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!isMounted) return;
         if (session?.user) {
+          const name = session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Usuário';
+          const role = session.user.user_metadata?.role || 'Administrador';
+          const avatar = session.user.user_metadata?.avatar;
+
           const profile: UserProfile = {
             id: session.user.id,
             email: session.user.email || '',
-            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Usuário',
-            role: session.user.user_metadata?.role || 'Administrador',
-            avatar: session.user.user_metadata?.avatar,
+            name,
+            role,
+            avatar,
           };
           setUser(profile);
           setIsSupabaseAuth(true);
           localStorage.setItem(USER_SESSION_KEY, JSON.stringify(profile));
         } else {
           // If explicitly signed out in Supabase
-          if (isSupabaseAuth) {
-            setUser(null);
-            setIsSupabaseAuth(false);
-            localStorage.removeItem(USER_SESSION_KEY);
-          }
+          setUser(null);
+          setIsSupabaseAuth(false);
+          localStorage.removeItem(USER_SESSION_KEY);
         }
       });
       authListener = data;
